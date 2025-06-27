@@ -1,5 +1,5 @@
 # Name of the project
-PROJECT = flashBlinky
+PROJECT = freeGPOS
 
 # Boot Stage 2 code files
 BOOT2DIR = boot2
