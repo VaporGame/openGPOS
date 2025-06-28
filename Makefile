@@ -1,8 +1,9 @@
 # Name of the project
 PROJECT = freeGPOS
 
+SRCDIR = src
 # Boot Stage 2 code files
-BOOT2DIR = boot2
+BOOT2DIR = $(SRCDIR)/boot2
 # BOOT2 = bootStage2
 # BOOT2 = bootStage2QuadOut
 BOOT2 = bootStage2QuadIO
@@ -47,7 +48,7 @@ $(BUILDBOOT2DIR)/$(CRCVALUE).c: $(BUILDBOOT2DIR)/$(BOOT2).elf $(BOOT2DIR)/$(COMP
 
 # Compile the project and link everything into an elf file
 $(BUILDDIR)/$(PROJECT).elf: $(BOOT2DIR)/$(BOOT2).c $(BUILDBOOT2DIR)/$(CRCVALUE).c $(LNKSCRIPT)
-	$(GCC) *.c $(BOOT2DIR)/$(BOOT2).c $(BUILDBOOT2DIR)/$(CRCVALUE).c $(GCCFLAGS) $(LNKFLAGS) -o $@
+	$(GCC) $(SRCDIR)/*.c $(BOOT2DIR)/$(BOOT2).c $(BUILDBOOT2DIR)/$(CRCVALUE).c $(GCCFLAGS) $(LNKFLAGS) -o $@
 	$(DMP) -hSD $(BUILDDIR)/$(PROJECT).elf > $(BUILDDIR)/$(PROJECT).objdump
 
 # Convert elf to bin to uf2 file
