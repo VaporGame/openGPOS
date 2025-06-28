@@ -45,7 +45,9 @@ SECTIONS
     _sdataf = LOADADDR(.data);          /* Get starting VMA */
 
     /* Get start and end of .bss section */
-    __bss_start__ = ADDR(.bss);                 /* Get starting LMA */
+    __bss_start__ = ADDR(.bss);         /* Get starting LMA */
+    _sbss = __bss_start__;
     __bss_end__ = __bss_start__ + SIZEOF(.bss);       /* Get ending LMA */
+    _ebss = __bss_end__;
     end = __bss_end__;
 }

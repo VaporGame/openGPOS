@@ -23,7 +23,7 @@ GPP = $(TOOLCHAIN)g++
 LNK = $(TOOLCHAIN)ld
 DMP = $(TOOLCHAIN)objdump
 CPY = $(TOOLCHAIN)objcopy
-GCCFLAGS ?= -mcpu=cortex-m0plus -O3 --specs=nano.specs
+GCCFLAGS ?= -mcpu=cortex-m0plus -O3 --specs=nano.specs -ffreestanding -nostdlib
 LNKFLAGS ?= -T $(LNKSCRIPT) -O3 --specs=nosys.specs
 
 # Utilities path

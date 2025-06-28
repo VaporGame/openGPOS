@@ -5,7 +5,7 @@
 typedef void (*vectFunc) (void);
 
 // Declare the initial stack pointer, the value will be provided by the linker
-extern uint32_t __stack, _sdata, _edata, _sdataf;
+extern uint32_t __stack, _sdata, _edata, _sdataf, _ebss, _sbss;
 
 // Declare _start function from libgloss
 extern void _start(void);
@@ -118,10 +118,15 @@ void resetHandler()
     for (uint32_t *dataPtr = &_sdata; dataPtr < &_edata; ++dataPtr)
         *dataPtr = *initValsPtr++;
     
-    // Initialize the system
+    // Initialize .bss section to zero
+    for (uint32_t *bssPtr = &_sbss; bssPtr < &_ebss; ++bssPtr)
+        *bssPtr = 0;
+
+    // Initialize the system (clock setup, watchdog)
     SystemInit();
 
-    _start(); // Call C Runtime Startup, it will jump to main function
+    //_start(); // Call C Runtime Startup, it will jump to main function
+    main();
     while(true); // Inf loop if we ever come back here
 }
 
