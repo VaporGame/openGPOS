@@ -38,6 +38,7 @@
 void SystemInit()
 {
     // Initialize XOSC
+    XOSC_CTRL = (0xaa0); //this makes it work
     XOSC_CTRL |= (0xfab << 12); // Enable XOSC
     while (!(XOSC_STATUS & (1 << 31))); // Wait for XOSC to stabilize
 
