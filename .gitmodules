@@ -4,6 +4,3 @@
 [submodule "utils/uf2"]
 	path = utils/uf2
 	url = https://github.com/microsoft/uf2.git
-[submodule "tinyusb"]
-	path = tinyusb
-	url = https://github.com/hathach/tinyusb.git
