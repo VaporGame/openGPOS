@@ -9,3 +9,9 @@ configure and compile with
 cmake -S . -B build
 cmake --build build
 ```
+
+features
+- [x] UART
+- [x] SPI
+- [] USB serial (planned)
+- [] SD library (WIP)
