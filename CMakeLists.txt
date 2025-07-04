@@ -33,6 +33,8 @@ set(SOURCES
     ${SRCDIR}/startup_rp2040.c
 )
 
+include_directories("${CMAKE_SOURCE_DIR}/include/")
+
 # Compile bootStage2 with linking
 add_executable(${BOOT2}.elf ${BOOT2DIR}/${BOOT2}.c)
 target_link_options(${BOOT2}.elf PUBLIC -T ${LNKSCRIPT} -O3 --specs=nosys.specs -ffreestanding -nostdlib) #this should be a variable but it doesnt wanna work as one

@@ -1,5 +1,8 @@
 #include <stdint.h>
 #include <stdbool.h>
+#include "hardware_structs/resets.h"
+#include "hardware_structs/io_bank0.h"
+#include "hardware_structs/sio.h"
 
 // Type of vector table entry
 typedef void (*vectFunc) (void);
@@ -130,23 +133,16 @@ void resetHandler()
     while(true); // Inf loop if we ever come back here
 }
 
-// Define necessary register addresses
-#define RESETS_RESET                                    *(volatile uint32_t *) (0x4000c000)
-#define RESETS_RESET_DONE                               *(volatile uint32_t *) (0x4000c008)
-#define IO_BANK0_GPIO25_CTRL                            *(volatile uint32_t *) (0x400140cc)
-#define SIO_GPIO_OE_SET                                 *(volatile uint32_t *) (0xd0000024)
-#define SIO_GPIO_OUT_XOR                                *(volatile uint32_t *) (0xd000001c)
-
 void defaultHandler()
 {
-    RESETS_RESET &= ~(1 << 5); // Bring IO_BANK0 out of reset state
-    while (!(RESETS_RESET_DONE & (1 << 5))); // Wait for peripheral to respond
-    IO_BANK0_GPIO25_CTRL = 5; // Set GPIO 25 function to SIO
-    SIO_GPIO_OE_SET |= 1 << 25; // Set output enable for GPIO 25 in SIO
+    resets_hw->RESET &= ~(1 << 5); // Bring IO_BANK0 out of reset state
+    while (!(resets_hw->RESET_DONE & (1 << 5))); // Wait for peripheral to respond
+    io_bank0_hw->gpio[25].CTRL = 5; // Set GPIO 25 function to SIO
+    sio_hw->OE_SET |= 1 << 25; // Set output enable for GPIO 25 in SIO
 
     while (true)
     {
         usSleep(50000); // Wait for 0.05sec
-        SIO_GPIO_OUT_XOR |= 1 << 25; // Flip output for GPIO 25
+        sio_hw->OUT_XOR |= 1 << 25; // Flip output for GPIO 25
     }
 }

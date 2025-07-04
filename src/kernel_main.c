@@ -1,29 +1,11 @@
 #include <stdint.h>
 #include <stdbool.h>
-
-typedef volatile uint32_t io_rw_32;
-
-// Define necessary register addresses
-#define RESETS_RESET                                    *(volatile uint32_t *) (0x4000c000)
-#define RESETS_RESET_DONE                               *(volatile uint32_t *) (0x4000c008)
-#define IO_BANK0_BASE                                   0x40014000
-#define IO_BANK0_GPIO00_CTRL                            *(volatile uint32_t *) (IO_BANK0_BASE + 0x04)
-#define IO_BANK0_GPIO01_CTRL                            *(volatile uint32_t *) (IO_BANK0_BASE + 0x0C)
-#define IO_BANK0_GPIO04_CTRL                            *(volatile uint32_t *) (IO_BANK0_BASE + 0x24)
-#define IO_BANK0_GPIO05_CTRL                            *(volatile uint32_t *) (IO_BANK0_BASE + 0x2c)
-#define IO_BANK0_GPIO06_CTRL                            *(volatile uint32_t *) (IO_BANK0_BASE + 0x34)
-#define IO_BANK0_GPIO07_CTRL                            *(volatile uint32_t *) (IO_BANK0_BASE + 0x3c)
-#define IO_BANK0_GPIO09_CTRL                            *(volatile uint32_t *) (IO_BANK0_BASE + 0x4c)
-
-#define IO_BANK0_GPIO16_CTRL                            *(volatile uint32_t *) (IO_BANK0_BASE + 0x84)
-#define IO_BANK0_GPIO18_CTRL                            *(volatile uint32_t *) (IO_BANK0_BASE + 0x94)
-#define IO_BANK0_GPIO19_CTRL                            *(volatile uint32_t *) (IO_BANK0_BASE + 0x9c)
-
-#define IO_BANK0_GPIO25_CTRL                            *(volatile uint32_t *) (IO_BANK0_BASE + 0xCC)
-#define SIO_GPIO_OE_SET                                 *(volatile uint32_t *) (0xd0000024)
-#define SIO_GPIO_OUT_XOR                                *(volatile uint32_t *) (0xd000001c)
-#define SIO_GPIO_OUT_SET                                *(volatile uint32_t *) (0xd0000014)
-#define SIO_GPIO_OUT_CLR                                *(volatile uint32_t *) (0xd0000018)
+#include "hardware_structs/resets.h"
+#include "hardware_structs/io_bank0.h"
+#include "hardware_structs/sio.h"
+#include "hardware_structs/uart.h"
+#include "hardware_structs/spi.h"
+#include "hardware_structs/pads_bank0.h"
 
 // Declare usSleep function
 extern void usSleep(uint64_t us);
@@ -32,53 +14,45 @@ extern void usSleep(uint64_t us);
 uint8_t blinkCnt;
 
 void blink_forever(void) {
-    IO_BANK0_GPIO25_CTRL = 5; // Set GPIO 25 function to SIO
-    SIO_GPIO_OE_SET |= 1 << 25; // Set output enable for GPIO 25 in SIO
+    io_bank0_hw->gpio[25].CTRL = 5;
+    sio_hw->OE_SET |= 1 << 25; // Set output enable for GPIO 25 in SIO
 
     while (++blinkCnt < 21)
     //while (1)
     {
         usSleep(500000); // Wait for 0.5sec
         //uartTx('A');
-        SIO_GPIO_OUT_XOR |= 1 << 25;  // Flip output for GPIO 25
+        sio_hw->OUT_XOR |= 1 << 25;  // Flip output for GPIO 25
     }
 }
 
-#define UART_BASE                                       0x40034000
-#define UART_DR                                         *(volatile uint32_t *) (UART_BASE)
-#define UART_FR                                         *(volatile uint32_t *) (UART_BASE + 0x18)
-#define UART_IBRD                                       *(volatile uint32_t *) (UART_BASE + 0x24)
-#define UART_FBRD                                       *(volatile uint32_t *) (UART_BASE + 0x28)
-#define UART_LCR_H                                      *(volatile uint32_t *) (UART_BASE + 0x2c)
-#define UART_LCR                                        *(volatile uint32_t *) (UART_BASE + 0x30)
-
 void resetSubsys(void) {
-    RESETS_RESET &= ~(1 << 5); // Bring IO_BANK0 out of reset state
-    while (!(RESETS_RESET_DONE & (1 << 5))); // Wait for peripheral to respond
+    resets_hw->RESET &= ~(1 << 5); // Bring IO_BANK0 out of reset state
+    while (!(resets_hw->RESET_DONE & (1 << 5))); // Wait for peripheral to respond
 
-    RESETS_RESET &= ~(1 << 8); // pads bank
-    while (!(RESETS_RESET_DONE & (1 << 8))); // Wait for peripheral to respond
+    resets_hw->RESET &= ~(1 << 8); // pads bank
+    while (!(resets_hw->RESET_DONE & (1 << 8))); // Wait for peripheral to respond
 
-    RESETS_RESET &= ~(1 << 22); //UART0
-    while (!(RESETS_RESET_DONE & (1 << 22))); // Wait for peripheral to respond
+    resets_hw->RESET &= ~(1 << 22); //UART0
+    while (!(resets_hw->RESET_DONE & (1 << 22))); // Wait for peripheral to respond
 
-    RESETS_RESET &= ~(1 << 16); //SPI0
-    while (!(RESETS_RESET_DONE & (1 << 16))); // Wait for peripheral to respond
+    resets_hw->RESET &= ~(1 << 16); //SPI0
+    while (!(resets_hw->RESET_DONE & (1 << 16))); // Wait for peripheral to respond
 }
 
 void uart_init(void) {
-    UART_IBRD = 78;
-    UART_FBRD = 8;
-    UART_LCR_H = (0x3 << 5) | (1 << 4);
-    UART_LCR = (1 << 9) | (1 << 8) | (1 << 0);    
+    uart_hw->IBRD = 78;
+    uart_hw->FBRD = 8;
+    uart_hw->LCR_H = (0x3 << 5) | (1 << 4);
+    uart_hw->LCR = (1 << 9) | (1 << 8) | (1 << 0);    
     //set pins to function 2 (uart)
-    IO_BANK0_GPIO00_CTRL = 2;
-    IO_BANK0_GPIO01_CTRL = 2;
+    io_bank0_hw->gpio[0].CTRL = 2;
+    io_bank0_hw->gpio[1].CTRL = 2;
 }
 
 void uartTx( unsigned char x) {
-    while ((UART_FR & (1 << 5)) != 0);
-    UART_DR = x;
+    while ((uart_hw->FR & (1 << 5)) != 0);
+    uart_hw->DR = x;
 }
 
 void uartTxStr(unsigned char *x) {
@@ -89,8 +63,8 @@ void uartTxStr(unsigned char *x) {
 }
 
 static char uartRx(void) {
-    while ((UART_FR & (1 << 4)) != 0);
-    return UART_DR;
+    while ((uart_hw->FR & (1 << 4)) != 0);
+    return uart_hw->DR;
 }
 
 static void *uartRxStr(char *str) { //this is bad
@@ -102,22 +76,6 @@ static void *uartRxStr(char *str) { //this is bad
     }
     str[--i] = '\0';
 }
-
-#define SPI0_BASE                               0x4003c000
-#define SPI0_SSPCR0                             *(volatile uint32_t *) (SPI0_BASE)
-#define SPI0_SSPCR1                             *(volatile uint32_t *) (SPI0_BASE + 0x004)
-#define SPI0_SSPSR                              *(volatile uint32_t *) (SPI0_BASE + 0x00c)
-#define SPI0_SSPDR                              *(volatile uint32_t *) (SPI0_BASE + 0x008)
-#define SPI0_SSCPSR                             *(volatile uint32_t *) (SPI0_BASE + 0x010)
-
-#define PADS_BANK0_BASE                         0x4001c000
-#define PADS_BANK0_GPIO06                       *(volatile uint32_t *) (PADS_BANK0_BASE + 0x1c)
-#define PADS_BANK0_GPIO07                       *(volatile uint32_t *) (PADS_BANK0_BASE + 0x20)
-#define PADS_BANK0_GPIO09                       *(volatile uint32_t *) (PADS_BANK0_BASE + 0x28)
-
-#define PADS_BANK0_GPIO18                       *(volatile uint32_t *) (PADS_BANK0_BASE + 0x4c)
-#define PADS_BANK0_GPIO19                       *(volatile uint32_t *) (PADS_BANK0_BASE + 0x50)
-
 
 static void hexToStr(char *str, int n) {
     int i, hb;
@@ -155,21 +113,21 @@ static void byteToStr(char *str, int n) {
 }
 
 void spi_send_byte(uint8_t data) {
-    while (!(SPI0_SSPSR & (1 << 1))); //wait untill transmit fifo not full
-    SPI0_SSPDR = data;
+    while (!(spi0_hw->SR & (1 << 1))); //wait untill transmit fifo not full
+    spi0_hw->DR = data;
 }
 
 void spi_rw(char *data, unsigned int len) {
     unsigned int i;
     char str[3];
     for (i = 0; i < len; i++) {
-        while (!(SPI0_SSPSR & (1 << 1))); //wait untill FIFO is not full
-        SPI0_SSPDR = data[i];
+        while (!(spi0_hw->SR & (1 << 1))); //wait untill FIFO is not full
+        spi0_hw->DR = data[i];
 
-        while (SPI0_SSPSR & (1 << 4)); //wait untill its not busy
+        while (spi0_hw->SR & (1 << 4)); //wait untill its not busy
 
-        if (SPI0_SSPSR & (1 << 2)) { //if receive FIFO is not empty
-            data[i] = SPI0_SSPDR;
+        if (spi0_hw->SR & (1 << 2)) { //if receive FIFO is not empty
+            data[i] = spi0_hw->DR;
         }
     }
 }
@@ -177,16 +135,16 @@ void spi_rw(char *data, unsigned int len) {
 void spi_rw_blocking(char *data, unsigned int len) {
     unsigned int i;
     for (i = 0; i < len; i++) {
-        while (!(SPI0_SSPSR & (1 << 1))); //wait untill FIFO is not full
+        while (!(spi0_hw->SR & (1 << 1))); //wait untill FIFO is not full
         //SPI0_SSPDR = data[i];
-        SPI0_SSPDR = 0xFF;
+        spi0_hw->DR = 0xFF;
 
 
-        while (SPI0_SSPSR & (1 << 4)); //wait untill its not busy
+        while (spi0_hw->SR & (1 << 4)); //wait untill its not busy
 
-        if (SPI0_SSPSR & (1 << 2)) { //if receive FIFO is not empty
+        if (spi0_hw->SR & (1 << 2)) { //if receive FIFO is not empty
         //while (!(SPI0_SSPSR & (1 << 2))) {} //if receive FIFO is not empty
-            data[i] = SPI0_SSPDR;
+            data[i] = spi0_hw->DR;
         }
     }
 }
@@ -195,50 +153,50 @@ static char buff[256]; //idk
 
 uint8_t spi_read_byte(void) {
     //spi_send_byte(0xFF); //send dummy byte to clock in data
-    while (!(SPI0_SSPSR & (1 << 2))); //wait untill receive fifo is not empty
-    return SPI0_SSPDR;
+    while (!(spi0_hw->SR & (1 << 2))); //wait untill receive fifo is not empty
+    return spi0_hw->DR;
 }
 
 uint8_t spi_rw_byte(uint8_t byte) {
-    SPI0_SSPDR = byte;
-    while (SPI0_SSPSR & (1 << 4));
-    return (uint8_t) SPI0_SSPDR;
+    spi0_hw->DR = byte;
+    while (spi0_hw->SR & (1 << 4));
+    return (uint8_t) spi0_hw->DR;
 }
 
 void spi_init(void) {
     //This may not be good, but it works
-    SPI0_SSPCR0 = (0x7 << 0); //set data size to 8bit
+    spi0_hw->CR0 = (0x7 << 0); //set data size to 8bit
     //frame format is motorola SPI by default
     //assume SPI mode 0
     //SPI0_SSPCR0 = ((1 << 6) | (1 << 7)); //SPO = 0, SPH = 0
-    SPI0_SSCPSR = 32;
+    spi0_hw->CPSR = 32;
     //we will want to change this afterwards to 2 to get a 6mhz clock
     //device is master by default
-    SPI0_SSPCR1 &= ~(1 << 2);
+    spi0_hw->CR1 &= ~(1 << 2);
     
     //SOD is only relevant in slave mode
     
     //setup pins
-    IO_BANK0_GPIO16_CTRL = 1; //function 1 SPI MISO
+    io_bank0_hw->gpio[16].CTRL = 1; //function 1 SPI MISO
     //IO_BANK0_GPIO05_CTRL = 1; //CS, doing software CS
-    IO_BANK0_GPIO18_CTRL = 1; //SCK
-    IO_BANK0_GPIO19_CTRL = 1; //MOSI
+    io_bank0_hw->gpio[18].CTRL = 1; //SCK
+    io_bank0_hw->gpio[19].CTRL = 1; //MOSI
     //set direction for pins 6 and 7
     //SIO_GPIO_OE_SET = (1 << 18);
     //SIO_GPIO_OE_SET = (1 << 19);
-    IO_BANK0_GPIO09_CTRL = 5;
-    SIO_GPIO_OE_SET = (1 << 9); //gp9 is gonna be cs
+    io_bank0_hw->gpio[9].CTRL = 5;
+    sio_hw->OE_SET = (1 << 9); //gp9 is gonna be cs
 
-    PADS_BANK0_GPIO18 = (1 << 1) | (1 << 8); //disable input, output disable is 0 by default
-    PADS_BANK0_GPIO19 = (1 << 1) | (1 << 8);
+    pads_bank0_hw->gpio[18] = (1 << 1) | (1 << 8); //disable input, output disable is 0 by default
+    pads_bank0_hw->gpio[19] = (1 << 1) | (1 << 8);
 
-    SPI0_SSPCR1 |= (1 << 1); //enable SSP
+    spi0_hw->CR1 |= (1 << 1); //enable SSP
 }
 
 bool sdInit(void) {
     usSleep(10000); //10ms, let sd card stabilize
 
-    SIO_GPIO_OUT_SET |= 1 << 9;
+    sio_hw->OUT_SET |= 1 << 9;
 
     for(uint8_t i = 0; i < 10; i++) {
         spi_send_byte(0xFF);
@@ -253,7 +211,7 @@ bool sdInit(void) {
     buff[4] = 0x00;
     buff[5] = 0x95;
     
-    SIO_GPIO_OUT_CLR |= 1 << 9;
+    sio_hw->OUT_CLR |= 1 << 9;
 
     for(uint8_t i = 0; i < 6; i++) {
         spi_send_byte(buff[i]);
@@ -275,7 +233,7 @@ bool sdInit(void) {
         return true;
     }
 
-    SIO_GPIO_OUT_SET |= 1 << 9;
+    sio_hw->OUT_SET |= 1 << 9;
     spi_send_byte(0xFF);
 
     uartTxStr("[FAIL]\r\n");
@@ -309,13 +267,13 @@ void kernel_main(void) {
         //uartTxStr(str);
         uartTxStr("\r\n");
         int len = strlen(str);
-        SIO_GPIO_OUT_CLR |= 1 << 9;
+        sio_hw->OUT_CLR |= 1 << 9;
         spi_rw_blocking(str, len);
         for(int i = 0; i < len; i++) {
             byteToStr(hex, str[i]);
             uartTxStr(hex);
         }
-        SIO_GPIO_OUT_SET |= 1 << 9;
+        sio_hw->OUT_SET |= 1 << 9;
         uartTxStr("\r\n");
     }
 
