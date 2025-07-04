@@ -13,5 +13,5 @@ cmake --build build
 features
 - [x] UART
 - [x] SPI
-- [] USB serial (planned)
-- [] SD library (WIP)
+- [ ] USB serial (planned)
+- [ ] SD library (WIP)
