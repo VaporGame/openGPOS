@@ -25,7 +25,7 @@ set(CMAKE_OBJDUMP "${TOOLCHAIN}objdump")
 
 set(UTILS ${CMAKE_SOURCE_DIR}/utils)
 
-set(CMAKE_C_FLAGS "-mcpu=cortex-m0plus -O3 --specs=nano.specs -ffreestanding -nostdlib")
+set(CMAKE_C_FLAGS "-mcpu=cortex-m0plus -O3 --specs=nano.specs -ffreestanding")
 
 set(SOURCES
     ${SRCDIR}/kernel_main.c
@@ -33,6 +33,8 @@ set(SOURCES
     ${SRCDIR}/startup_rp2040.c
     ${SRCDIR}/hardware/uart.c
     ${SRCDIR}/hardware/spi.c
+    ${SRCDIR}/SD.c
+    ${SRCDIR}/hexutils.c
 )
 
 include_directories("${CMAKE_SOURCE_DIR}/include/")
@@ -62,7 +64,7 @@ add_custom_command(
 # Compile the project and link everything into an elf file
 add_executable(${PROJECT_NAME}.elf ${SOURCES} ${BOOT2DIR}/${BOOT2}.c ${BUILDBOOT2DIR}/${CRCVALUE}.c)
 target_link_options(${PROJECT_NAME}.elf PUBLIC -T ${LNKSCRIPT} -O3 --specs=nosys.specs -ffreestanding -nostdlib) #this should be a variable but it doesnt wanna work as one
-
+target_link_libraries(${PROJECT_NAME}.elf PUBLIC gcc)
 
 # Convert elf to bin to uf2 file
 add_custom_target(${PROJECT_NAME}.uf2 ALL

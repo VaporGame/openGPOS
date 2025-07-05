@@ -55,6 +55,7 @@ typedef struct {
 #define rosc_hw         ((xosc_hw_t *)ROSC_BASE)
 
 #define PLL_SYS_BASE    0x40028000
+#define CLK_SYS_HZ      200000000
 
 typedef struct {
     io_reg_32 CS;

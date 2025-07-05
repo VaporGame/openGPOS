@@ -15,7 +15,8 @@ void SystemInit()
     pll_sys_hw->FBDIV_INT = 100; // Set feedback clock div = 100, thus VCO clock = 12MHz * 100 = 1.2GHz
     pll_sys_hw->PWR &= ~((1 << 0) | (1 << 5)); // Turn on the main power and VCO
     while (!(pll_sys_hw->CS & (1 << 31))); // Wait for PLL to lock
-    pll_sys_hw->PRIM = (6 << 16) | (2 << 12); // Set POSTDIV1 = 6 and POSTDIV2 = 2, thus 1.2GHz / 6 / 2 = 100MHz
+    // pll_sys_hw->PRIM = (6 << 16) | (2 << 12); // Set POSTDIV1 = 6 and POSTDIV2 = 2, thus 1.2GHz / 6 / 2 = 100MHz
+    pll_sys_hw->PRIM = (6 << 16) | (1 << 12); // Set POSTDIV1 = 6 and POSTDIV2 = 2, thus 1.2GHz / 6 / 1 = 200MHz
     pll_sys_hw->PWR &= ~(1 << 3); // Turn on the post dividers
 
     // Setup clock generators
@@ -26,7 +27,8 @@ void SystemInit()
     clocks_hw->SYS_CTRL |= (1 << 0); // Switch clk_sys glitchless mux to CLKSRC_CLK_SYS_AUX and the aux defaults to CLKSRC_PLL_SYS
     while (!(clocks_hw->SYS_SELECTED & (1 << 1)));// Make sure that the switch happened
     //setup clk_peri
-    clocks_hw->PERI_CTRL |= ((1 << 11) | (4 << 5));
+    // clocks_hw->PERI_CTRL |= ((1 << 11) | (4 << 5));
+    clocks_hw->PERI_CTRL = (1 << 11);
     //while (!(CLOCKS_PERI_SELECTED & (4 << 5)));
 
     // Shut down ROSC

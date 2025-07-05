@@ -1,8 +1,9 @@
-#include "spi.h"
+#include "hardware/spi.h"
 #include "hardware_structs/spi.h"
 #include "hardware_structs/io_bank0.h"
 #include "hardware_structs/pads_bank0.h"
 #include "hardware_structs/sio.h"
+//#include "hardware/uart.h"
 
 void spi_send_byte(uint8_t data) {
     while (!(spi0_hw->SR & (1 << 1))); //wait untill transmit fifo not full
@@ -11,7 +12,6 @@ void spi_send_byte(uint8_t data) {
 
 void spi_rw(char *data, unsigned int len) {
     unsigned int i;
-    char str[3];
     for (i = 0; i < len; i++) {
         while (!(spi0_hw->SR & (1 << 1))); //wait untill FIFO is not full
         spi0_hw->DR = data[i];
