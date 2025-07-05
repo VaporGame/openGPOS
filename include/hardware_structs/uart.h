@@ -1,5 +1,5 @@
-#ifndef UART_H
-#define UART_H
+#ifndef HARDWARE_STRUCTS_UART_H
+#define HARDWARE_STRUCTS_UART_H
 #include <stdint.h>
 #include "hardware_structs/platform_defs.h"
 
@@ -22,4 +22,4 @@ typedef struct {
 } uart_hw_t;
 #define uart_hw     ((uart_hw_t *)UART_BASE)
 
-#endif //UART_H
+#endif //HARDWARE_STRUCTS_UART_H

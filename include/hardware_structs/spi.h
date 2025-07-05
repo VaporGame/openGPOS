@@ -1,5 +1,5 @@
-#ifndef SPI_H
-#define SPI_H
+#ifndef HARDWARE_STRUCTS_SPI_H
+#define HARDWARE_STRUCTS_SPI_H
 #include <stdint.h>
 #include "hardware_structs/platform_defs.h"
 
@@ -15,4 +15,4 @@ typedef struct {
 } spi0_hw_t;
 #define spi0_hw     ((spi0_hw_t *)SPI0_BASE)
 
-#endif //SPI_H
+#endif //HARDWARE_STRUCTS_SPI_H
