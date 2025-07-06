@@ -1,7 +1,10 @@
 #include "hexutils.h"
 #include <stdint.h>
+#include <stdbool.h>
 
-void hexToStr(char *str, uint8_t n) {
+#include "hardware/uart.h"
+
+void hexToStr(char *str, uint32_t n) {
     int i, hb;
 
     for (i = 0; i < 8; i++) {
@@ -34,4 +37,33 @@ void byteToStr(char *str, uint8_t n) {
         str[1] = nb - 10 + 'A';
     }
     str[2] = '\0';
+}
+
+void byteToDec(char *str, uint8_t n) {
+    str[2] = n % 10 + '0';
+    str[1] = (n / 10) % 10 + '0';
+    str[0] = (n / 100) % 10 + '0';
+    str[3] = '\0';
+}
+
+void intToDec(char* str, uint32_t n) { // Trims zeroes
+    if (n == 0) {
+        str[0] = '0';
+        str[1] = '\0';
+        return;
+    }
+
+    int8_t i = 0;
+    char temp_str[12];
+
+    while (n > 0) {
+        temp_str[i++] = (n % 10) + '0';
+        n /= 10;
+    }
+
+    uint8_t j = 0;
+    while (i > 0) {
+        str[j++] = temp_str[--i];
+    }
+    str[j] = '\0';
 }

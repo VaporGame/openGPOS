@@ -53,30 +53,32 @@ static void kernel_main(void) {
     uartTxStr("initializing SPI\r\n");
     spi_init();
 
-    if(!sdInit()) {
+    if(!SDInit()) {
         uartTxStr("Failed to initialize SD card\r\n");
         uartTxStr("(rebooting a few times can fix the issue)\r\n");
         uartTxStr("Cannot continue booting\r\n");
         return;
     }
 
-    char str[100];
-    char hex[3];
+    uint8_t csd_buf[16];
 
-    while (true) {
-        uartRxStr(str);
-        //uartTxStr(str);
+    SDReadCSD(csd_buf);
+
+    uint8_t block_data[512];
+
+    if(sdReadBlock(0, block_data)) {
+        char hex[3];
+        uartTxStr("Block 0 read sucessfully\r\n");
+        byteToStr(hex, block_data[510]);
+        uartTxStr(hex);
         uartTxStr("\r\n");
-        int len = strlen(str);
-        sio_hw->OUT_CLR |= 1 << 9;
-        spi_rw_blocking(str, len);
-        for(int i = 0; i < len; i++) {
-            byteToStr(hex, str[i]);
-            uartTxStr(hex);
-        }
-        sio_hw->OUT_SET |= 1 << 9;
-        uartTxStr("\r\n");
+        byteToStr(hex, block_data[511]);
+        uartTxStr(hex);
+    } else {
+        uartTxStr("Failed to read block 0\r\n");
     }
+
+    while (true) {}
 }
 
 // Main entry point
