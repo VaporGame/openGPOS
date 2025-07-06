@@ -110,7 +110,7 @@ bool SDInit(void) {
         spi_send_byte(0xFF); // Dummy clock
 
         if(r7_data[2] == 0x01 && r7_data[3] == 0xAA) {
-            uartTxStr("CMD8 OK\r\n");
+            //uartTxStr("CMD8 OK\r\n");
         } else {
             uartTxStr("CMD8 R1 OK, but incorrect data pattern. Card unusable\r\n");
             sio_hw->OUT_SET |= 1 << 9; // Deassert CS
@@ -156,7 +156,7 @@ bool SDInit(void) {
         spi_send_byte(0xFF); // Dummy clock
 
         if (acmd41_r1 == 0x00) {
-            uartTxStr("ACMD41 OK: Card is ready\r\n");
+            //uartTxStr("ACMD41 OK: Card is ready\r\n");
             break;
         }
 
@@ -186,7 +186,7 @@ bool SDInit(void) {
         spi_send_byte(0xFF);
         
         if (ocr_data[0] & 0x40) {
-            uartTxStr("CMD58 OK: Card is SDHC/SDXC\r\n");
+            //uartTxStr("CMD58 OK: Card is SDHC/SDXC\r\n");
         } else {
             uartTxStr("CMD58 OK: Card is Standard Capacity, unsupported, this should never happen");
             return false;
@@ -199,7 +199,7 @@ bool SDInit(void) {
 }
 
 bool SDReadCSD(uint8_t *csd_buffer) {
-    uartTxStr("Reading CSD register...\r\n");
+    //uartTxStr("Reading CSD register...\r\n");
 
     // CMD9 (SEND_CSD)
     SDSendCommand(0x49, 0x00000000, 0x01);
@@ -237,10 +237,11 @@ bool SDReadCSD(uint8_t *csd_buffer) {
         uint32_t c_size = ((csd_buffer[7] & 0x3F) << 16) | (csd_buffer[8] << 8) | csd_buffer[9];
 
         uint32_t capacity_bytes = (c_size + 1) / 2; // 512KB blocks
-        uartTxStr("Calculated Capacity: ");
-        char hex2[11];
-        intToDec(hex2, capacity_bytes);
-        uartTxStr(hex2);
+        uartTxStr("Capacity: ");
+        // char hex2[11];
+        // intToDec(hex2, capacity_bytes);
+        // uartTxStr(hex2);
+        uartTxDec(capacity_bytes);
         uartTxStr(" MB\r\n");
     } else {
         uartTxStr("CSD Version 1.0 detected (or unknown). Capacity calculation differs.\r\n");
@@ -250,7 +251,7 @@ bool SDReadCSD(uint8_t *csd_buffer) {
 }
 
 bool sdReadBlock(uint32_t block_address, uint8_t *data_buffer) {
-    uartTxStr("reading block");
+    //uartTxStr("reading block");
 
     // CMD17 (READ_SINGLE_BLOCK)
     // for SDHC/SDXC, block address is already in 512 byte units
@@ -274,14 +275,14 @@ bool sdReadBlock(uint32_t block_address, uint8_t *data_buffer) {
     sio_hw->OUT_SET |= 1 << 9; // Deassert CS
     spi_send_byte(0xFF);
 
-    uartTxStr("Block data (first 16 bytes):\r\n");
-    char hex_buf[3];
-    for (uint8_t i = 0; i < 16; i++) {
-        byteToStr(hex_buf, data_buffer[i]);
-        uartTxStr(hex_buf);
-        uartTx(' ');
-    }
-    uartTxStr("\r\n");
+    // uartTxStr("Block data (first 16 bytes):\r\n");
+    // char hex_buf[3];
+    // for (uint8_t i = 0; i < 16; i++) {
+    //     byteToStr(hex_buf, data_buffer[i]);
+    //     uartTxStr(hex_buf);
+    //     uartTx(' ');
+    // }
+    // uartTxStr("\r\n");
 
     return true;
 }

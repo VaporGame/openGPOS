@@ -32,6 +32,30 @@ void uartRxStr(char *str) {
     str[--i] = '\0';
 }
 
+void uartTxHexByte(uint8_t byte) {
+    char hex[3];
+    byteToStr(hex, byte);
+    uartTxStr(hex);
+}
+
+void uartTxDecByte(uint8_t byte) {
+    char dec[4];
+    byteToDec(dec, byte);
+    uartTxStr(dec);
+}
+
+void uartTxHex(uint32_t n) {
+    char hex[9];
+    hexToStr(hex, n);
+    uartTxStr(hex);
+}
+
+void uartTxDec(uint32_t n) {
+    char dec[11];
+    intToDec(dec, n);
+    uartTxStr(dec);
+}
+
 void uart_init(uint32_t baud_rate) {
     // taken from sdk
     // currently the peripheral clock runs from the sys clock, which runs at 200mhz
