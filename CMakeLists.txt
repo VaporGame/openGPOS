@@ -35,7 +35,14 @@ set(SOURCES
     ${SRCDIR}/hardware/spi.c
     ${SRCDIR}/SD.c
     ${SRCDIR}/hexutils.c
+    ${SRCDIR}/fs/FAT32.c
 )
+
+file(GLOB_RECURSE LIB_C_FILES
+    "${CMAKE_SOURCE_DIR}/libc/src/*.c"
+)
+
+list(APPEND SOURCES ${LIB_C_FILES})
 
 include_directories("${CMAKE_SOURCE_DIR}/include/")
 
@@ -65,6 +72,8 @@ add_custom_command(
 add_executable(${PROJECT_NAME}.elf ${SOURCES} ${BOOT2DIR}/${BOOT2}.c ${BUILDBOOT2DIR}/${CRCVALUE}.c)
 target_link_options(${PROJECT_NAME}.elf PUBLIC -T ${LNKSCRIPT} -O3 --specs=nosys.specs -ffreestanding -nostdlib) #this should be a variable but it doesnt wanna work as one
 target_link_libraries(${PROJECT_NAME}.elf PUBLIC gcc)
+target_include_directories(${PROJECT_NAME}.elf PUBLIC 
+                            ${CMAKE_SOURCE_DIR}/libc/include)
 
 # Convert elf to bin to uf2 file
 add_custom_target(${PROJECT_NAME}.uf2 ALL
@@ -73,7 +82,14 @@ add_custom_target(${PROJECT_NAME}.uf2 ALL
     DEPENDS ${PROJECT_NAME}.elf
 )
 
-add_custom_target(copyUF2 ALL
-    COMMAND cp ${BUILDDIR}/${PROJECT_NAME}.uf2 ${CMAKE_SOURCE_DIR}/${PROJECT_NAME}.uf2
+# add_custom_target(copyUF2 ALL
+#     COMMAND cp ${BUILDDIR}/${PROJECT_NAME}.uf2 ${CMAKE_SOURCE_DIR}/${PROJECT_NAME}.uf2
+#     DEPENDS ${BUILDDIR}/${PROJECT_NAME}.uf2
+# )
+
+# Automatically flash to pico
+add_custom_target(flash ALL
+    COMMAND picotool load ${BUILDDIR}/${PROJECT_NAME}.uf2
+    COMMAND picotool reboot
     DEPENDS ${BUILDDIR}/${PROJECT_NAME}.uf2
 )

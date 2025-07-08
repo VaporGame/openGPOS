@@ -250,6 +250,8 @@ bool SDReadCSD(uint8_t *csd_buffer) {
     return true;
 }
 
+// TODO: IMPLEMENT MULTI BLOCK READING SD COMMANDS
+
 bool sdReadBlock(uint32_t block_address, uint8_t *data_buffer) {
     //uartTxStr("reading block");
 
@@ -275,14 +277,87 @@ bool sdReadBlock(uint32_t block_address, uint8_t *data_buffer) {
     sio_hw->OUT_SET |= 1 << 9; // Deassert CS
     spi_send_byte(0xFF);
 
-    // uartTxStr("Block data (first 16 bytes):\r\n");
-    // char hex_buf[3];
-    // for (uint8_t i = 0; i < 16; i++) {
-    //     byteToStr(hex_buf, data_buffer[i]);
-    //     uartTxStr(hex_buf);
-    //     uartTx(' ');
-    // }
-    // uartTxStr("\r\n");
+    return true;
+}
+
+static bool sdWaitForNotBusy(uint32_t timeout_ms) {
+    uint32_t timeout_counter = 0; // Or use actual time if available
+    const uint32_t MAX_TIMEOUT_COUNT = 1000000; // Adjust as needed for your clock speed
+
+    while (spi_read_byte() == 0x00) { // SD card holds DO low (0x00) when busy
+        timeout_counter++;
+        if (timeout_counter > MAX_TIMEOUT_COUNT) {
+            uartTxStr("SD card busy timeout!\r\n");
+            return false; // Timeout occurred
+        }
+    }
+    return true; // SD card is no longer busy
+}
+
+bool sdWriteBlock(uint32_t block_address, uint8_t *data_buffer) {
+    //uartTxStr("reading block");
+
+    // CMD24 (READ_SINGLE_BLOCK)
+    // for SDHC/SDXC, block address is already in 512 byte units
+    SDSendCommand(0x58, block_address, 0x01); //dummy crc
+
+    uint8_t cmd24_r1 = read_r1_response(0xFF);
+    if (cmd24_r1 != 0x00) {
+        uartTxStr("CMD24 FAIL\r\n");
+        sio_hw->OUT_SET |= 1 << 9; // Deassert CS
+        spi_send_byte(0xFF);
+        return false;
+    }
+
+    // Send start block token
+    spi_send_byte(0xFE);
+
+    for (uint16_t i = 0; i < 512; i++) {
+        spi_send_byte(data_buffer[i]);
+    }
+
+    spi_send_byte(0xFF); //MSB of dummy CRC
+    spi_send_byte(0xFF); //LSB of dummy CRC
+
+    uint8_t data_response;
+
+    for(uint16_t i = 0; i < 1000; i++) {
+        data_response = spi_read_byte();
+        if (data_response != 0xFF) break;
+    }
+
+    if ((data_response & 0x1F) != 0x05) { // Check for data accepted (0b00000101)
+        uartTxStr("Data write response error");
+        sio_hw->OE_SET |= 1 << 9;
+        spi_send_byte(0xFF);
+        return false;
+    }
+
+    if (!sdWaitForNotBusy(500)) {
+        sio_hw->OE_SET |= 1 << 9;
+        spi_send_byte(0xFF);
+        return false;
+    }
+
+    sio_hw->OUT_SET |= 1 << 9; // Deassert CS
+    spi_send_byte(0xFF);
 
     return true;
+}
+
+bool SDShutdown(void) {
+    SDSendCommand(0x40, 0x00000000, 0x95);
+    uint8_t cmd0_r1 = read_r1_response(0xFF);
+    
+    
+    if (cmd0_r1 == 0x01) {
+        sio_hw->OUT_SET |= 1 << 9;
+        spi_send_byte(0xFF);
+
+        uartTxStr("SD Card idle\r\n");
+        return true;
+    } else {
+        uartTxStr("Failed to bring SD card into idle state\r\n");
+        return false;
+    }
 }
