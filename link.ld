@@ -50,4 +50,6 @@ SECTIONS
     __bss_end__ = __bss_start__ + SIZEOF(.bss);       /* Get ending LMA */
     _ebss = __bss_end__;
     end = __bss_end__;
+    __heap_start__ = __bss_end__;
+    __heap_end__ = ORIGIN(sram) + 0x40000;
 }
