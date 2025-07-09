@@ -3,7 +3,7 @@ ENTRY(bootStage2);
 MEMORY
 {
     flash(rx) : ORIGIN = 0x10000000, LENGTH = 2048k
-    sram(rwx) : ORIGIN = 0x20000000, LENGTH = 256k
+    sram(rwx) : ORIGIN = 0x20000000, LENGTH = 256k /* can be adjusted to 264 */
 }
 
 SECTIONS
@@ -25,12 +25,16 @@ SECTIONS
 
     .data :
     {
+        __data_start__ = .; 
         *(.data*)
+        __data_end__ = .;
     } > sram AT > flash     /* "> sram" is the VMA, "> flash" is the LMA */
 
     .bss (NOLOAD) :
     {
+        __bss_start__ = .;
         *(.bss*)
+        __bss_end__ = .;
     } > sram
 
     .stack (NOLOAD) :
@@ -39,17 +43,9 @@ SECTIONS
         __stack = .;
     } > sram
 
-    /* Get LMA and VMA for .data section */
-    _sdata = ADDR(.data);               /* Get starting LMA */
-    _edata = _sdata + SIZEOF(.data);    /* Get ending LMA */
+    /* Get VMA for .data section */
     _sdataf = LOADADDR(.data);          /* Get starting VMA */
 
-    /* Get start and end of .bss section */
-    __bss_start__ = ADDR(.bss);         /* Get starting LMA */
-    _sbss = __bss_start__;
-    __bss_end__ = __bss_start__ + SIZEOF(.bss);       /* Get ending LMA */
-    _ebss = __bss_end__;
-    end = __bss_end__;
     __heap_start__ = __bss_end__;
-    __heap_end__ = ORIGIN(sram) + 0x40000;
+    __heap_end__ = __stack;
 }
