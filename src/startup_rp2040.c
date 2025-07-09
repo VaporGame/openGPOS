@@ -4,6 +4,8 @@
 #include "hardware_structs/io_bank0.h"
 #include "hardware_structs/sio.h"
 
+#include <libc/string.h>
+
 // Type of vector table entry
 typedef void (*vectFunc) (void);
 
@@ -117,13 +119,10 @@ const vectFunc vector[48] __attribute__((section(".vector"))) =
 void resetHandler()
 {
     // Copy .data section from FLASH to SRAM
-    uint32_t *initValsPtr = &_sdataf;
-    for (uint32_t *dataPtr = &_sdata; dataPtr < &_edata; ++dataPtr)
-        *dataPtr = *initValsPtr++;
-    
-    // Initialize .bss section to zero
-    for (uint32_t *bssPtr = &_sbss; bssPtr < &_ebss; ++bssPtr)
-        *bssPtr = 0;
+    memcpy(&_sdata, &_sdataf, (size_t)(&_edata - &_sdata) * sizeof(uint32_t));
+
+    // // Initialize .bss section to zero
+    memset(&_sbss, 0, (size_t)(&_ebss - &_sbss) * sizeof(uint32_t));
 
     // Initialize the system (clock setup, watchdog)
     SystemInit();
