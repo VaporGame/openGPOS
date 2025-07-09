@@ -304,11 +304,14 @@ static uint8_t fat_sfn_checksum(const uint8_t *sfn_name) {
     return sum;
 }
 
-static void fat_lfn_to_utf8(uint16_t *utf16_name_part, char *out_buffer, size_t max_len) {
+static void fat_lfn_to_utf8(uint8_t *utf16_name_part, size_t copy_len, char *out_buffer, size_t max_len) {
+    uint16_t buffer[copy_len];
+    memcpy(buffer, utf16_name_part, copy_len);
+
     size_t current_len = strlen(out_buffer);
     unsigned int i;
-    for (i = 0; i < (max_len - current_len - 1); i++) {
-            uint16_t wc = utf16_name_part[i];
+    for (i = 0; i < copy_len / 2; i++) {
+            uint16_t wc = buffer[i];
         if (wc == 0x0000 || wc == 0xFFFF) {
             break;
         }
@@ -332,12 +335,12 @@ fat_error_t fat_init_root_dir_iterator(fat_directory_iterator_t *iter, uint32_t 
     
     memset(iter, 0, sizeof(fat_directory_iterator_t));
     iter->current_cluster = start_cluster;
-    //iter->current_cluster = g_fat32_volume_info.root_dir_cluster;
     iter->current_sector_in_cluster = -1;
     iter->current_entry_in_sector = 0;
     iter->sector_buffer_valid = false;
-    iter->lfn_buffer[0] = '\0';
-    iter->lfn_sequence_count = 0;
+
+    iter->assembled_lfn_buffer[0] = '\0';
+    iter->lfn_parts_found = 0;
     iter->lfn_checksum = 0;
     return FAT_SUCCESS;
 }
@@ -385,10 +388,6 @@ fat_error_t fat_read_next_dir_entry(fat_directory_iterator_t *iter, fat_file_inf
             // Read new sector
             uint32_t sector_lba = fatClusterToLba(iter->current_cluster) + iter->current_sector_in_cluster;
 
-            // uartTxStr("Reading dir sector LBA: ");
-            // uartTxHex(sector_lba);
-            // uartTxStr("\r\n");
-
             if (sdReadBlock(sector_lba, iter->sector_buffer) == false) {
                 uartTxStr("Failed to read dir sector\r\n");
                 return FAT_ERROR_READ_FAIL;
@@ -417,30 +416,36 @@ fat_error_t fat_read_next_dir_entry(fat_directory_iterator_t *iter, fat_file_inf
         // Check for LFN entry
         if ((entry->sfn.DIR_Attr & FAT_ATTR_LFN) == FAT_ATTR_LFN) {
             fat_lfn_dir_entry_t *lfn_entry = &entry->lfn;
+            uint8_t order = lfn_entry->LDIR_Ord & ~0x40;
+            
+            if (order == 0 || order > MAX_LFN_PARTS) {
+                iter->lfn_parts_found = 0;
+                iter->lfn_checksum = 0;
+                iter->assembled_lfn_buffer[0] = '\0';
+                // Clear segment buffers
+                for (uint8_t i = 0; i < MAX_LFN_PARTS; i++) iter->lfn_buffer[i][0] = '\0';
+                uartTxStr("Invalid lfn order");
+                continue;
+            }
 
             // // Check if this is the last LFN entry
             if (lfn_entry->LDIR_Ord & 0x40) {
-                iter->lfn_sequence_count = (lfn_entry->LDIR_Ord & ~0x40);
-                iter->lfn_buffer[0] = '\0';
                 iter->lfn_checksum =lfn_entry->LDIR_Chksum;
-            } else if (iter->lfn_buffer[0] == '\0') {
-                // This means we are reading the LFN entry, but havent seen the last one
-                // meaning its either corrupt or we started reading in the middle
-                iter->lfn_sequence_count = 0;
-                iter->lfn_buffer[0] = '\0';
-                continue; // Skip fragmented LFN part
+                // Clear segment buffers
+                for (uint8_t i = 0; i < MAX_LFN_PARTS; i++) iter->lfn_buffer[i][0] = '\0';
+            } else if (iter->lfn_checksum == 0) {
+                uartTxStr("Out of order lfn part\r\n");
+                continue;
             }
 
-            // Need to do this to avoid misaligned memory acces
-            uint16_t buffer[6];
-            memcpy(buffer, lfn_entry->LDIR_Name1, 10);
-            fat_lfn_to_utf8(buffer, iter->lfn_buffer, MAX_FILENAME_LEN);
+            char *segment_dest = iter->lfn_buffer[order - 1];
+            segment_dest[0] = '\0';
 
-            memcpy(buffer, lfn_entry->LDIR_Name2, 12);
-            fat_lfn_to_utf8(buffer, iter->lfn_buffer, MAX_FILENAME_LEN);
+            fat_lfn_to_utf8((uint8_t *)lfn_entry->LDIR_Name1, 10, segment_dest, MAX_FILENAME_LEN);
+            fat_lfn_to_utf8((uint8_t *)lfn_entry->LDIR_Name2, 12, segment_dest, MAX_FILENAME_LEN);
+            fat_lfn_to_utf8((uint8_t *)lfn_entry->LDIR_Name3, 4, segment_dest, MAX_FILENAME_LEN);
 
-            memcpy(buffer, lfn_entry->LDIR_Name3, 4);
-            fat_lfn_to_utf8(buffer, iter->lfn_buffer, MAX_FILENAME_LEN);
+            iter->lfn_parts_found++;
 
             // idfk know anymore its 1am
             continue;
@@ -449,12 +454,18 @@ fat_error_t fat_read_next_dir_entry(fat_directory_iterator_t *iter, fat_file_inf
         // If we reached here, it's an SFN entry
         fat_sfn_dir_entry_t *sfn_entry = &entry->sfn;
         // Validate LFN checksum if an LFN sequence was being processed
-        if (iter->lfn_sequence_count > 0) {
+        if (iter->lfn_parts_found > 0) {
             uint8_t sfn_checksum = fat_sfn_checksum(sfn_entry->DIR_Name);
+
             if (sfn_checksum == iter->lfn_checksum) {
-                strncpy(file_info_out->filename, iter->lfn_buffer, MAX_FILENAME_LEN - 1);
+                iter->assembled_lfn_buffer[0] = '\0';
+                for (uint8_t i = 0; i < iter->lfn_parts_found; i++) {
+                    strncat(iter->assembled_lfn_buffer, iter->lfn_buffer[i], MAX_FILENAME_LEN - 1 - strlen(iter->assembled_lfn_buffer));
+                }
+                iter->assembled_lfn_buffer[MAX_FILENAME_LEN-1] = '\0';
+
+                strncpy(file_info_out->filename, iter->assembled_lfn_buffer, MAX_FILENAME_LEN - 1);
                 file_info_out->filename[MAX_FILENAME_LEN - 1] = '\0';
-                fat_sfn_to_string(sfn_entry->DIR_Name, file_info_out->filename);
             } else {
                 // Checksum mismatch, fallback to sfn
                 uartTxStr("LFN checksum mismtach, falling back to sfn\r\n");
@@ -462,9 +473,10 @@ fat_error_t fat_read_next_dir_entry(fat_directory_iterator_t *iter, fat_file_inf
             }
             
             // Reset LFN state after matching SFN
-            iter->lfn_sequence_count = 0;
-            iter->lfn_buffer[0] = '0';
+            iter->lfn_parts_found = 0;
+            iter->assembled_lfn_buffer[0] = '0';
             iter->lfn_checksum = 0;
+            for (uint8_t i = 0; i < MAX_LFN_PARTS; i++) iter->lfn_buffer[i][0] = '\0';
         } else {
             // No LFN, use SFN
             fat_sfn_to_string(sfn_entry->DIR_Name, file_info_out->filename);

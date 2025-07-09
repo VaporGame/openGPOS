@@ -3,6 +3,10 @@
 #include <stdbool.h>
 #include "SD.h"
 
+#define MAX_LFN_PARTS    20 // Max LFN length is 255 chars / 13 chars per LFN entry = ~19.6. Use 20 for safety.
+#define MAX_UTF8_CHARS_PER_LFN_PART (13 * 3 + 1) // 13 UTF-16 chars * max 3 bytes/UTF8 char + null
+
+
 #define MAX_FILENAME_LEN 256 // Max LFN length (255 chars + null)
 
 typedef enum {
@@ -23,8 +27,9 @@ typedef struct {
     bool      sector_buffer_valid;  // True if buffer contains valid data
 
     // For LFN reconstruction
-    char      lfn_buffer[MAX_FILENAME_LEN]; // Buffer to build LFN
-    uint8_t   lfn_sequence_count;   // Expected number of LFN entries
+    char      lfn_buffer[MAX_LFN_PARTS][MAX_UTF8_CHARS_PER_LFN_PART]; // Buffer to build LFN
+    char      assembled_lfn_buffer[MAX_FILENAME_LEN];
+    uint8_t   lfn_parts_found; // Expected number of LFN entries
     uint8_t   lfn_checksum;         // Checksum of the SFN to match LFNs
 } fat_directory_iterator_t;
 
