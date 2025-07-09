@@ -8,6 +8,7 @@
 #include "SD.h"
 #include "hexutils.h"
 #include "fs/FAT32.h"
+#include <libc/stdlib.h>
 
 // Declare usSleep function
 extern void usSleep(uint64_t us);
@@ -52,25 +53,48 @@ static void kernel_main(void) {
         uartTxStr("Cannot continue booting\r\n");
         return;
     }
-    
-    fat32_init();
-    fat_directory_iterator_t root_dir_iter;
-    fat_init_root_dir_iterator(&root_dir_iter, 2); // TODO: make this use actual root dir sector instead of assuming 2
 
-    fat_file_info_t my_file;
-    fat_error_t result = fat_read_next_dir_entry(&root_dir_iter, &my_file);
+    init_malloc();
+
+    fat32_init();
+    fat_directory_iterator_t *root_dir_iter = malloc(sizeof(fat_directory_iterator_t));
+    if(root_dir_iter == NULL) {
+        uartTxStr("Failed to allocate root_dir_iter");
+        return;
+    }
+    // uartTxHex(sizeof(fat_directory_iterator_t));
+    // uartTxStr("\r\n");
+    // uartTxHex((uint32_t)root_dir_iter);
+    // uartTxStr("\r\n");
+    fat_init_root_dir_iterator(root_dir_iter, 2); // TODO: make this use actual root dir sector instead of assuming 2
+
+    // //uartTxHex(root_dir_iter->current_cluster);
+
+    fat_file_info_t *my_file = malloc(sizeof(fat_file_info_t));
+    if(my_file == NULL) {
+        uartTxStr("Failed to allocate my_file");
+        return;
+    }
+    // uartTxHex(sizeof(fat_file_info_t));
+    // uartTxStr("\r\n");
+    // uartTxHex((uint32_t)my_file);
+    // uartTxStr("\r\n");
+    // dumpHeap();
+    fat_error_t result = fat_read_next_dir_entry(root_dir_iter, my_file);
+
+    //uartTxHex(root_dir_iter->current_cluster);
 
     if (result == FAT_SUCCESS) {
-        uartTxStr("Found file: "); uartTxStr(my_file.filename);
-        uartTx(' '); uartTxDec(my_file.file_size); uartTxStr(" bytes\r\n");
+        uartTxStr("Found file: "); uartTxStr(my_file->filename);
+        uartTx(' '); uartTxDec(my_file->file_size); uartTxStr(" bytes\r\n");
 
         uint8_t file_content_buffer[5];
         uint8_t read_size = 4;
-        if (my_file.file_size < read_size) {
-            read_size = my_file.file_size;
+        if (my_file->file_size < read_size) {
+            read_size = my_file->file_size;
         }
 
-        fat_error_t read_res = fat_read_file(&my_file, file_content_buffer, read_size, 0);
+        fat_error_t read_res = fat_read_file(my_file, file_content_buffer, read_size, 0);
         if (read_res == FAT_SUCCESS) {
             uartTxStr("File content: ");
 
@@ -86,7 +110,12 @@ static void kernel_main(void) {
             uartTxStr("Failed to read file\r\n");
         }
 
+    } else {
+        uartTxDec(result);
     }
+
+    free(root_dir_iter);
+    free(my_file);
 
     // while((result ) == FAT_SUCCESS) {
     //     uartTxStr(file_info.filename);

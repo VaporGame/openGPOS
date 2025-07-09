@@ -4,6 +4,8 @@
 #include <libc/string.h>
 #include <stdbool.h>
 
+#include "hardware/uart.h"
+
 //==============================================================================
 // TYPES AND CONSTANTS
 //==============================================================================
@@ -11,8 +13,8 @@
 extern char __heap_start__[];
 extern char __heap_end__[];
 
-#define __heap_size__ (__heap_end__ - __heap_start__)
 #define ALIGN_4BYTE(x) (((size_t)x + (4 - 1)) & -4)
+#define __heap_size__ (__heap_end__ - (char*)ALIGN_4BYTE(__heap_start__))
 
 typedef struct {
     void *prev;
@@ -59,7 +61,7 @@ bool mergeNextMemorySpace(memory_space_t* memory_space) {
 
 bool splitMemorySpace(memory_space_t* memory_space, size_t size) {
     // check if we can split this memory space, and also leave some room
-    if(memory_space->size > size + sizeof(memory_space_t) + 16) {
+    if(memory_space->size > size + sizeof(memory_space_t) + 4) {
         memory_space_t* next = (void*)memory_space + sizeof(memory_space_t) + size;
         next->prev = memory_space;
         next->next = memory_space->next;
@@ -121,11 +123,34 @@ void *realloc(void *ptr, size_t size) {
 }
 
 void free(void *ptr) {
+    if (ptr == (void*)0) return;
+
     memory_space_t* memory_space = ptr - sizeof(memory_space_t);
     memory_space->isAllocated = false;
-    memory_space_t* prev_memory_space = memory_space->prev;
 
     mergeNextMemorySpace(memory_space);
+
+    memory_space_t* prev_memory_space = memory_space->prev;
     if(prev_memory_space && !prev_memory_space->isAllocated)
-        mergeNextMemorySpace(memory_space->prev);
+        // mergeNextMemorySpace(memory_space->prev);
+        mergeNextMemorySpace(prev_memory_space);
+}
+
+void dumpHeap() {
+    // puts("[");
+    uartTx('[');
+    memory_space_t *curr = head;
+
+    //printf("\tstart: %p, size: %ld, isalloc: %d\n", curr, curr->size, curr->isAllocated);
+    uartTxStr("start: "); uartTxHex((uint32_t)curr); uartTxStr(",size: "); uartTxDec(curr->size); uartTxStr(",lloc"); uartTxDec(curr->isAllocated); uartTxStr("\r\n");
+    uartRx();
+
+    while(curr->next) {
+        curr = curr->next;
+        //printf("\tstart: %p, size: %ld, isalloc: %d\n", curr, curr->size, curr->isAllocated);
+        uartTxStr("start: "); uartTxHex((uint32_t)curr); uartTxStr(",size: "); uartTxDec(curr->size); uartTxStr(",lloc"); uartTxDec(curr->isAllocated); uartTxStr("\r\n");
+        uartRx();
+    }
+    // puts("]");
+    uartTx(']');
 }

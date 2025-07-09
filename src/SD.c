@@ -8,6 +8,11 @@
 
 extern void usSleep(uint64_t us);
 
+static void deassertCS() {
+    sio_hw->OUT_SET |= 1 << 9; // Deassert CS
+    spi_send_byte(0xFF); // Dummy clock
+}
+
 static void SDSendCommand(uint8_t command, uint32_t args, uint8_t crc) {
     sio_hw->OUT_CLR |= 1 << 9;
     spi_send_byte(command);
@@ -89,9 +94,7 @@ bool SDInit(void) {
     if (cmd0_r1 == 0x01) {
         uartTxStr("[OK]\r\n");
     } else {
-        sio_hw->OUT_SET |= 1 << 9;
-        spi_send_byte(0xFF);
-
+        deassertCS();
         uartTxStr("[FAIL]\r\n");
         return false;
     }
@@ -106,27 +109,23 @@ bool SDInit(void) {
     if (CMD8_r1 == 0x1) {
         read_bytes(r7_data, 4);
         
-        sio_hw->OUT_SET |= 1 << 9; // Deassert CS
-        spi_send_byte(0xFF); // Dummy clock
+        deassertCS();
 
         if(r7_data[2] == 0x01 && r7_data[3] == 0xAA) {
             //uartTxStr("CMD8 OK\r\n");
         } else {
             uartTxStr("CMD8 R1 OK, but incorrect data pattern. Card unusable\r\n");
-            sio_hw->OUT_SET |= 1 << 9; // Deassert CS
-            spi_send_byte(0xFF); // Dummy clock
+            deassertCS();
             return false;
         }
 
     } else if (CMD8_r1 == 0x05) {
         uartTxStr("Unsupported card\r\n");
-        sio_hw->OUT_SET |= 1 << 9; // Deassert CS
-        spi_send_byte(0xFF); // Dummy clock
+        deassertCS();
         return false;
     } else {
         uartTxStr("CMD8 Unexpected R1 response\r\n");
-        sio_hw->OUT_SET |= 1 << 9; // Deassert CS
-        spi_send_byte(0xFF); // Dummy clock
+        deassertCS();
         return false;
     }
 
@@ -140,8 +139,7 @@ bool SDInit(void) {
     do {
         SDSendCommand(0x77, 0x00000000, 0x65); //CMD55
         uint8_t cmd55_r1 = read_r1_response(0xFF);
-        sio_hw->OUT_SET |= 1 << 9; // Deassert CS
-        spi_send_byte(0xFF); // Dummy clock
+        deassertCS();
 
         if (cmd55_r1 != 0x01) {
             uartTxStr("CMD55 unexpected R1 response\r\n");
@@ -152,8 +150,7 @@ bool SDInit(void) {
         //i only support HC/HX cards for now
         SDSendCommand(0x69, 0x40000000, 0x77);
         acmd41_r1 = read_r1_response(0xFF);
-        sio_hw->OUT_SET |= 1 << 9; // Deassert CS
-        spi_send_byte(0xFF); // Dummy clock
+        deassertCS();
 
         if (acmd41_r1 == 0x00) {
             //uartTxStr("ACMD41 OK: Card is ready\r\n");
@@ -182,17 +179,17 @@ bool SDInit(void) {
             ocr_data[i] = spi_read_byte();
             spi_send_byte(0xFF);
         }
-        sio_hw->OUT_SET |= 1 << 9;
-        spi_send_byte(0xFF);
         
         if (ocr_data[0] & 0x40) {
             //uartTxStr("CMD58 OK: Card is SDHC/SDXC\r\n");
         } else {
             uartTxStr("CMD58 OK: Card is Standard Capacity, unsupported, this should never happen");
+            deassertCS();
             return false;
         }
     } else {
         uartTxStr("CMD58 FAIL");
+        deassertCS();
         return false;
     }
     return true;
@@ -207,30 +204,18 @@ bool SDReadCSD(uint8_t *csd_buffer) {
     uint8_t cmd9_r1 = read_r1_response(0xFF);
     if (cmd9_r1 != 0x00) {
         uartTxStr("CMD9 FAIL\r\n");
-        sio_hw->OUT_SET |= 1 << 9;
-        spi_send_byte(0xFF);
+        deassertCS();
         return false;
     }
 
     // Read 16-byte CSD data block
     if (!read_data_block(csd_buffer, 16, 0xFFFF)) {
         uartTxStr("Failed to read CSD data block\r\n");
-        sio_hw->OUT_SET |= 1 << 9;
-        spi_send_byte(0xFF);
+        deassertCS();
         return false;
     }
 
-    sio_hw->OUT_SET |= 1 << 9;
-    spi_send_byte(0xFF);
-
-    // uartTxStr("CSD Data (16 bytes)\r\n");
-    // char hex_buf[3];
-    // for (uint8_t i = 0; i < 16; i++) {
-    //     byteToStr(hex_buf, csd_buffer[i]);
-    //     uartTxStr(hex_buf);
-    //     uartTx(' ');
-    // }
-    // uartTxStr("\r\n");
+    deassertCS();
 
     //Parse CSD to get card capacity
     if (((csd_buffer[0] >> 6) & 0x03) == 0x1) { // CSD_STRUCTURE == 1 (CSD Version 2.0)
@@ -262,20 +247,17 @@ bool sdReadBlock(uint32_t block_address, uint8_t *data_buffer) {
     uint8_t cmd17_r1 = read_r1_response(0xFF);
     if (cmd17_r1 != 0x00) {
         uartTxStr("CMD17 FAIL\r\n");
-        sio_hw->OUT_SET |= 1 << 9; // Deassert CS
-        spi_send_byte(0xFF);
+        deassertCS();
         return false;
     }
 
     if (!read_data_block(data_buffer, 512, 0xFFFF)) {
         uartTxStr("Failed to read data block\r\n");
-        sio_hw->OUT_SET |= 1 << 9; // Deassert CS
-        spi_send_byte(0xFF);
+        deassertCS();
         return false;
     }
 
-    sio_hw->OUT_SET |= 1 << 9; // Deassert CS
-    spi_send_byte(0xFF);
+    deassertCS();
 
     return true;
 }
@@ -304,8 +286,7 @@ bool sdWriteBlock(uint32_t block_address, uint8_t *data_buffer) {
     uint8_t cmd24_r1 = read_r1_response(0xFF);
     if (cmd24_r1 != 0x00) {
         uartTxStr("CMD24 FAIL\r\n");
-        sio_hw->OUT_SET |= 1 << 9; // Deassert CS
-        spi_send_byte(0xFF);
+        deassertCS();
         return false;
     }
 
@@ -328,19 +309,16 @@ bool sdWriteBlock(uint32_t block_address, uint8_t *data_buffer) {
 
     if ((data_response & 0x1F) != 0x05) { // Check for data accepted (0b00000101)
         uartTxStr("Data write response error");
-        sio_hw->OE_SET |= 1 << 9;
-        spi_send_byte(0xFF);
+        deassertCS();
         return false;
     }
 
     if (!sdWaitForNotBusy(500)) {
-        sio_hw->OE_SET |= 1 << 9;
-        spi_send_byte(0xFF);
+        deassertCS();
         return false;
     }
 
-    sio_hw->OUT_SET |= 1 << 9; // Deassert CS
-    spi_send_byte(0xFF);
+    deassertCS();
 
     return true;
 }
@@ -349,11 +327,8 @@ bool SDShutdown(void) {
     SDSendCommand(0x40, 0x00000000, 0x95);
     uint8_t cmd0_r1 = read_r1_response(0xFF);
     
-    
     if (cmd0_r1 == 0x01) {
-        sio_hw->OUT_SET |= 1 << 9;
-        spi_send_byte(0xFF);
-
+        deassertCS();
         uartTxStr("SD Card idle\r\n");
         return true;
     } else {

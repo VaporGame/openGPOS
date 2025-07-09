@@ -13,7 +13,6 @@ typedef enum {
     FAT_ERROR_END_OF_CHAIN,
     FAT_ERROR_NOT_INITIALIZED,
     FAT_ERROR_NO_MORE_ENTRIES, // New error for readdir
-    // ... add more as needed
 } fat_error_t;
 
 typedef struct {
@@ -36,9 +35,6 @@ typedef struct {
     uint8_t  attributes;
     bool     is_directory;
 } fat_file_info_t;
-
-// bool parseMbr(void);
-// bool parseBPB(void);
 
 fat_error_t fat_init_root_dir_iterator(fat_directory_iterator_t *iter, uint32_t start_cluster);
 fat_error_t fat_read_next_dir_entry(fat_directory_iterator_t *iter, fat_file_info_t *file_info_out);

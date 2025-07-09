@@ -329,7 +329,7 @@ fat_error_t fat_init_root_dir_iterator(fat_directory_iterator_t *iter, uint32_t 
     if (iter == NULL) {
         return FAT_ERROR_BAD_FAT_ENTRY;
     }
-
+    
     memset(iter, 0, sizeof(fat_directory_iterator_t));
     iter->current_cluster = start_cluster;
     //iter->current_cluster = g_fat32_volume_info.root_dir_cluster;
@@ -347,6 +347,11 @@ fat_error_t fat_read_next_dir_entry(fat_directory_iterator_t *iter, fat_file_inf
         return FAT_ERROR_NOT_INITIALIZED;
     }
     if (file_info_out == NULL) {
+        uartTxStr("file info is NULL\r\n");
+        return FAT_ERROR_BAD_FAT_ENTRY;
+    }
+    if (iter == NULL) {
+        uartTxStr("iter is NULL\r\n");
         return FAT_ERROR_BAD_FAT_ENTRY;
     }
 
@@ -355,7 +360,7 @@ fat_error_t fat_read_next_dir_entry(fat_directory_iterator_t *iter, fat_file_inf
 
     while (true) {
         // Check if we need to load a new sector
-        if (!iter->sector_buffer_valid || iter->current_entry_in_sector >= entries_per_sector) {
+        if (iter->sector_buffer_valid == false || iter->current_entry_in_sector >= entries_per_sector) {
             // Advance to the next sector in cluster
             iter->current_sector_in_cluster++;
             iter->current_entry_in_sector = 0;
@@ -413,7 +418,7 @@ fat_error_t fat_read_next_dir_entry(fat_directory_iterator_t *iter, fat_file_inf
         if ((entry->sfn.DIR_Attr & FAT_ATTR_LFN) == FAT_ATTR_LFN) {
             fat_lfn_dir_entry_t *lfn_entry = &entry->lfn;
 
-            // Check if this is the last LFN entry
+            // // Check if this is the last LFN entry
             if (lfn_entry->LDIR_Ord & 0x40) {
                 iter->lfn_sequence_count = (lfn_entry->LDIR_Ord & ~0x40);
                 iter->lfn_buffer[0] = '\0';
@@ -426,9 +431,16 @@ fat_error_t fat_read_next_dir_entry(fat_directory_iterator_t *iter, fat_file_inf
                 continue; // Skip fragmented LFN part
             }
 
-            fat_lfn_to_utf8(lfn_entry->LDIR_Name1, iter->lfn_buffer, MAX_FILENAME_LEN);
-            fat_lfn_to_utf8(lfn_entry->LDIR_Name2, iter->lfn_buffer, MAX_FILENAME_LEN);
-            fat_lfn_to_utf8(lfn_entry->LDIR_Name3, iter->lfn_buffer, MAX_FILENAME_LEN);
+            // Need to do this to avoid misaligned memory acces
+            uint16_t buffer[6];
+            memcpy(buffer, lfn_entry->LDIR_Name1, 10);
+            fat_lfn_to_utf8(buffer, iter->lfn_buffer, MAX_FILENAME_LEN);
+
+            memcpy(buffer, lfn_entry->LDIR_Name2, 12);
+            fat_lfn_to_utf8(buffer, iter->lfn_buffer, MAX_FILENAME_LEN);
+
+            memcpy(buffer, lfn_entry->LDIR_Name3, 4);
+            fat_lfn_to_utf8(buffer, iter->lfn_buffer, MAX_FILENAME_LEN);
 
             // idfk know anymore its 1am
             continue;
@@ -461,12 +473,11 @@ fat_error_t fat_read_next_dir_entry(fat_directory_iterator_t *iter, fat_file_inf
         file_info_out->first_cluster = (read_le16((uint8_t*)sfn_entry, 20) << 16) | read_le16((uint8_t*)sfn_entry, 26);
         file_info_out->file_size = read_le32((uint8_t*)sfn_entry, 28);
 
-
         file_info_out->attributes = sfn_entry->DIR_Attr;
         file_info_out->is_directory = (sfn_entry->DIR_Attr & FAT_ATTR_DIRECTORY) != 0;
 
         // Skip volume ID entries (if they don't have LFNs and aren't actually directories)
-        if ((file_info_out->attributes & FAT_ATTR_VOLUME_ID) && !file_info_out->is_directory) {
+        if ((file_info_out->attributes & FAT_ATTR_VOLUME_ID) && file_info_out->is_directory == false) {
             continue; // Skip this entry and try next
         }
 
