@@ -14,4 +14,9 @@ features
 - [x] UART
 - [x] SPI
 - [ ] USB serial (planned)
-- [ ] SD library (WIP)
+- [x] SD library (WIP)
+- [x] FAT32 library (WIP)
+- [ ] ELF support
+
+TODO:
+- [ ] Replace Cmake with a python script

@@ -58,25 +58,26 @@ static void kernel_main(void) {
 
     fat32_init();
     fat_directory_iterator_t *root_dir_iter = malloc(sizeof(fat_directory_iterator_t));
-    if(root_dir_iter == NULL) {
-        uartTxStr("Failed to allocate root_dir_iter");
+    if (root_dir_iter == NULL) {
+        uartTxStr("Failed to allocate root_dir_iter\r\n");
         return;
     }
     fat_init_root_dir_iterator(root_dir_iter, 2); // TODO: make this use actual root dir sector instead of assuming 2
 
 
     fat_file_info_t *my_file = malloc(sizeof(fat_file_info_t));
-    if(my_file == NULL) {
-        uartTxStr("Failed to allocate my_file");
+    if (my_file == NULL) {
+        uartTxStr("Failed to allocate my_file\r\n");
         return;
     }
 
-    for(uint8_t i = 0; i < 2; i++) {
-        fat_error_t result = fat_read_next_dir_entry(root_dir_iter, my_file);
-
+    fat_error_t result = FAT_SUCCESS;
+    uartTxStr("\r\n");
+    while (result != FAT_ERROR_NO_MORE_ENTRIES) {
+        result = fat_read_next_dir_entry(root_dir_iter, my_file);
 
         if (result == FAT_SUCCESS) {
-            if(my_file->is_directory) {
+            if (my_file->is_directory) {
                 uartTxStr("dir "); uartTxStr(my_file->filename); uartTxStr("\r\n");
                 continue;
             } else {
@@ -93,21 +94,21 @@ static void kernel_main(void) {
 
             fat_error_t read_res = fat_read_file(my_file, file_content_buffer, read_size, 0);
             if (read_res == FAT_SUCCESS) {
-                uartTxStr("content: ");
+                uartTxStr("content:\r\n");
 
-                for(uint32_t i = 0; i < read_size; i++) {
+                for (uint32_t i = 0; i < read_size; i++) {
                     if (file_content_buffer[i] >= 32 && file_content_buffer[i] <= 126) {
                         uartTx(file_content_buffer[i]);
                     } else {
                         uartTx('?');
                     }
                 }
-                uartTxStr("\r\n");
+                uartTxStr("\r\n\r\n");
             } else {
                 uartTxStr("Failed to read file\r\n");
             }
 
-        } else {
+        } else if (result != FAT_ERROR_NO_MORE_ENTRIES) {
             uartTxDec(result);
         }
     }

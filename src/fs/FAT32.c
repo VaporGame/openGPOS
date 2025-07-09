@@ -374,7 +374,7 @@ fat_error_t fat_read_next_dir_entry(fat_directory_iterator_t *iter, fat_file_inf
                 fat_error_t fat_res = getNextCluster(iter->current_cluster, &next_cluster);
                 
                 if (fat_res == FAT_ERROR_END_OF_CHAIN) {
-                    uartTxStr("End of dir chain\r\n");
+                    //uartTxStr("End of dir chain\r\n");
                     return FAT_ERROR_NO_MORE_ENTRIES;
                 } else if (fat_res != FAT_SUCCESS) {
                     uartTxStr("Failed to get next cluster in dir\r\n");
@@ -404,7 +404,7 @@ fat_error_t fat_read_next_dir_entry(fat_directory_iterator_t *iter, fat_file_inf
 
         // Check for end of dir marker (0x00)
         if (first_byte == 0x00) {
-            uartTxStr("End of dir marker found\r\n");
+            //uartTxStr("End of dir marker found\r\n");
             return FAT_ERROR_NO_MORE_ENTRIES;
         }
 

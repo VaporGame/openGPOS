@@ -25,7 +25,7 @@ set(CMAKE_OBJDUMP "${TOOLCHAIN}objdump")
 
 set(UTILS ${CMAKE_SOURCE_DIR}/utils)
 
-set(CMAKE_C_FLAGS "-mcpu=cortex-m0plus -O3 --specs=nano.specs -ffreestanding")
+set(CMAKE_C_FLAGS "-mcpu=cortex-m0plus -O3 --specs=nano.specs -ffreestanding -nostdlib")
 
 set(SOURCES
     ${SRCDIR}/kernel_main.c
@@ -48,7 +48,7 @@ include_directories("${CMAKE_SOURCE_DIR}/include/")
 
 # Compile bootStage2 with linking
 add_executable(${BOOT2}.elf ${BOOT2DIR}/${BOOT2}.c)
-target_link_options(${BOOT2}.elf PUBLIC -T ${LNKSCRIPT} -O3 --specs=nosys.specs -ffreestanding -nostdlib) #this should be a variable but it doesnt wanna work as one
+target_link_options(${BOOT2}.elf PUBLIC -T ${LNKSCRIPT})
 set_target_properties(${BOOT2}.elf PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${BUILDBOOT2DIR}/"
 )
@@ -70,7 +70,7 @@ add_custom_command(
 
 # Compile the project and link everything into an elf file
 add_executable(${PROJECT_NAME}.elf ${SOURCES} ${BOOT2DIR}/${BOOT2}.c ${BUILDBOOT2DIR}/${CRCVALUE}.c)
-target_link_options(${PROJECT_NAME}.elf PUBLIC -T ${LNKSCRIPT} -O3 --specs=nosys.specs -ffreestanding -nostdlib) #this should be a variable but it doesnt wanna work as one
+target_link_options(${PROJECT_NAME}.elf PUBLIC -T ${LNKSCRIPT})
 target_link_libraries(${PROJECT_NAME}.elf PUBLIC gcc)
 target_include_directories(${PROJECT_NAME}.elf PUBLIC 
                             ${CMAKE_SOURCE_DIR}/libc/include)
@@ -81,11 +81,6 @@ add_custom_target(${PROJECT_NAME}.uf2 ALL
     COMMAND python3 ${UTILS}/uf2/utils/uf2conv.py -b 0x10000000 -f 0xe48bff56 -c ${BUILDDIR}/${PROJECT_NAME}.bin -o ${BUILDDIR}/${PROJECT_NAME}.uf2
     DEPENDS ${PROJECT_NAME}.elf
 )
-
-# add_custom_target(copyUF2 ALL
-#     COMMAND cp ${BUILDDIR}/${PROJECT_NAME}.uf2 ${CMAKE_SOURCE_DIR}/${PROJECT_NAME}.uf2
-#     DEPENDS ${BUILDDIR}/${PROJECT_NAME}.uf2
-# )
 
 # Automatically flash to pico
 add_custom_target(flash ALL

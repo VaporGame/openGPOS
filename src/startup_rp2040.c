@@ -10,7 +10,8 @@
 typedef void (*vectFunc) (void);
 
 // Declare the initial stack pointer, the value will be provided by the linker
-extern uint32_t __stack, _sdata, _edata, _sdataf, _ebss, _sbss;
+// extern uint32_t __stack, _sdata, _edata, _sdataf, _ebss, _sbss;
+extern uint32_t __stack, __data_start__, __data_end__, _sdataf, __bss_end__, __bss_start__;
 
 // Declare _start function from libgloss
 extern void _start(void);
@@ -119,10 +120,10 @@ const vectFunc vector[48] __attribute__((section(".vector"))) =
 void resetHandler()
 {
     // Copy .data section from FLASH to SRAM
-    memcpy(&_sdata, &_sdataf, (size_t)(&_edata - &_sdata) * sizeof(uint32_t));
+    memcpy(&__data_start__, &_sdataf, (size_t)(&__data_end__ - &__data_start__) * sizeof(uint32_t));
 
     // // Initialize .bss section to zero
-    memset(&_sbss, 0, (size_t)(&_ebss - &_sbss) * sizeof(uint32_t));
+    memset(&__bss_start__, 0, (size_t)(&__bss_end__ - &__bss_start__) * sizeof(uint32_t));
 
     // Initialize the system (clock setup, watchdog)
     SystemInit();
