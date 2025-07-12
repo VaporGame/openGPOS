@@ -4,13 +4,14 @@
 #include "hardware_structs/clocks.h"
 #include <stdint.h>
 #include "hexutils.h"
+#include <stddef.h>
 
 void uartTx( unsigned char x) {
     while ((uart_hw->FR & (1 << 5)) != 0);
     uart_hw->DR = x;
 }
 
-void uartTxStr(unsigned char *x) {
+void uartTxStr(unsigned const char *x) {
     while(*x != '\0') {
         uartTx(*x);
         x++;
@@ -23,7 +24,7 @@ char uartRx(void) {
 }
 
 void uartRxStr(char *str) {
-    unsigned int dat;
+    unsigned char dat = '\0';
     int i = 0;
     while (dat != '\r') {
         dat = uartRx();

@@ -5,7 +5,7 @@
 void uart_init(uint32_t baud_rate);
 
 void uartTx( unsigned char x);
-void uartTxStr(unsigned char *x);
+void uartTxStr(unsigned const char *x);
 
 char uartRx(void);
 void uartRxStr(char *str);
