@@ -6,6 +6,9 @@
 #include <stddef.h>
 #include <libc/string.h>
 
+#define MAX_OPEN_FILES 16
+file_handle_t open_file_handles[MAX_OPEN_FILES];
+
 uint32_t fat32_volume_start_lba = 0;
 uint32_t fat32_volume_sector_count = 0;
 
@@ -201,6 +204,12 @@ static bool parseBPB(void) {
 bool fat32_init(void) {
     if (!parseMBR()) return false;
     if (!parseBPB()) return false;
+
+    // init handles
+    for (uint32_t i = 0; i < MAX_OPEN_FILES; i++) {
+        open_file_handles[i].is_free = true;
+    }
+
     return true;
 }
 
@@ -497,98 +506,260 @@ fat_error_t fat_read_next_dir_entry(fat_directory_iterator_t *iter, fat_file_inf
     }
 }
 
-fat_error_t fat_read_file(const fat_file_info_t *file_info, uint8_t *buffer, uint32_t bytes_to_read, uint32_t offset_in_file) {
+static int min(int a, int b) {
+    if (a < b) {
+        return a;
+    } else {
+        return b;
+    }
+}
+
+static fat_error_t fat_read_file(uint32_t file_id, uint8_t *buffer, uint32_t bytes_to_read) {
     if (!g_fat32_volume_info.is_initialized) {
         return FAT_ERROR_NOT_INITIALIZED;
     }
-    if (file_info == NULL || buffer == NULL) {
+
+    if (buffer == NULL) {
         return FAT_ERROR_BAD_FAT_ENTRY;
     }
 
+    file_handle_t *file_handle = &open_file_handles[file_id];
+
     // Ensure we dont read beyong the size or requested bytes
-    if (offset_in_file >= file_info->file_size) {
+    if (file_handle->current_file_pos >= file_handle->file_size) {
         return FAT_SUCCESS;
     }
 
     uint32_t actual_bytes_to_read = bytes_to_read;
-    if (offset_in_file + actual_bytes_to_read > file_info->file_size) {
-        actual_bytes_to_read = file_info->file_size - offset_in_file;
+    if (file_handle->current_file_pos + actual_bytes_to_read > file_handle->file_size) {
+        actual_bytes_to_read = file_handle->file_size - file_handle->current_file_pos;
     }
     if (actual_bytes_to_read == 0) {
+        //uartTxStr("No bytes to read\r\n");
         return FAT_SUCCESS; // Nothing to read
     }
 
     uint32_t bytes_read_total = 0;
-    uint32_t current_cluster = file_info->first_cluster;
 
     uint32_t sectors_per_cluster = g_fat32_volume_info.sectors_per_cluster;
     uint32_t bytes_per_sector = g_fat32_volume_info.bytes_per_sector;
-    uint16_t bytes_per_cluster = sectors_per_cluster * bytes_per_sector;
+    uint32_t bytes_per_cluster = sectors_per_cluster * bytes_per_sector;
 
     uint8_t sector_buffer[bytes_per_sector]; // Temp buffer for reading sectors
 
     // Seek to the starting cluster and offset within that cluster
-    uint32_t cluster_offset_bytes = offset_in_file;
-    uint32_t num_clusters_to_skip = cluster_offset_bytes / bytes_per_cluster;
+    //uint32_t cluster_offset_bytes = file_handle->current_file_pos;
+    //uint32_t num_clusters_to_skip = cluster_offset_bytes / bytes_per_cluster;
 
-    for (uint32_t i = 0; i < num_clusters_to_skip; i++) {
-        uint32_t next_cluster;
-        fat_error_t res = getNextCluster(current_cluster, &next_cluster);
-        if (res ==  FAT_ERROR_END_OF_CHAIN) {
-            uartTxStr("File truncated or corrupted during seek\r\n");
-            return FAT_ERROR_READ_FAIL;
-        } else if (res != FAT_SUCCESS) {
-            uartTxStr("Error seeking to file offset. Cluster read fail.\r\n");
-            return res;
-        }
-        current_cluster = next_cluster;
-    }
+    // for (uint32_t i = 0; i < num_clusters_to_skip; i++) {
+    //     uint32_t next_cluster;
+    //     fat_error_t res = getNextCluster(file_handle->current_cluster, &next_cluster);
+    //     if (res ==  FAT_ERROR_END_OF_CHAIN) {
+    //         uartTxStr("File truncated or corrupted during seek\r\n");
+    //         return FAT_ERROR_READ_FAIL;
+    //     } else if (res != FAT_SUCCESS) {
+    //         uartTxStr("Error seeking to file offset. Cluster read fail.\r\n");
+    //         return res;
+    //     }
+    //     file_handle->current_cluster = next_cluster;
+    // }
 
     // Now the current_cluster is the cluster where the read should start
     // Calculate the byte offset withing the starting cluster.
-    uint32_t byte_offset_in_start_cluster = cluster_offset_bytes % bytes_per_cluster;
-    uint32_t start_sector_in_cluster = byte_offset_in_start_cluster / bytes_per_sector;
-    uint32_t start_byte_in_sector = byte_offset_in_start_cluster % bytes_per_sector;
+    // uint32_t byte_offset_in_start_cluster = cluster_offset_bytes % bytes_per_cluster;
+    // uint32_t start_sector_in_cluster = byte_offset_in_start_cluster / bytes_per_sector;
+    // uint32_t start_byte_in_sector = byte_offset_in_start_cluster % bytes_per_sector;
+
+    uint32_t current_sector_in_cluster = file_handle->current_offset / bytes_per_sector;
+    uint32_t current_byte_in_sector = file_handle->current_offset % bytes_per_sector;
 
     // Loop to read data
     while (bytes_read_total < actual_bytes_to_read) {
-        uint32_t current_sector_lba = fatClusterToLba(current_cluster) + start_sector_in_cluster;
-
-        // uartTxStr("Reading file data from LBA: "); uartTxHex(current_sector_lba); uartTxStr("\r\n");
+        uint32_t current_sector_lba = fatClusterToLba(file_handle->current_cluster) + current_sector_in_cluster;
 
         if (!sdReadBlock(current_sector_lba, sector_buffer)) {
-            uartTxStr("Error: Failed to read file data sector.\r\n");
+            //uartTxStr("Error: Failed to read file data sector.\r\n");
             return FAT_ERROR_READ_FAIL;
         }
         
         // Calculate how much data to copy from this sector
-        uint32_t bytes_to_copy_from_sector = bytes_per_sector - start_byte_in_sector;
-        if (bytes_to_copy_from_sector > (actual_bytes_to_read - bytes_read_total)) {
-            bytes_to_copy_from_sector = actual_bytes_to_read - bytes_read_total;
-        }
+        // uint32_t bytes_to_copy_from_sector = bytes_per_sector - start_byte_in_sector;
+        // if (bytes_to_copy_from_sector > (actual_bytes_to_read - bytes_read_total)) {
+        //     bytes_to_copy_from_sector = actual_bytes_to_read - bytes_read_total;
+        // }
 
-        memcpy(buffer + bytes_read_total, sector_buffer + start_byte_in_sector, bytes_to_copy_from_sector);
-        bytes_read_total += bytes_to_copy_from_sector;
+        uint32_t bytes_left_in_sector = bytes_per_sector - current_byte_in_sector;
+        uint32_t bytes_to_copy = min(actual_bytes_to_read - bytes_read_total, bytes_left_in_sector);
 
-        // Prepare for next read
-        start_byte_in_sector = 0;
-        start_sector_in_cluster++;
+        memcpy(buffer + bytes_read_total, sector_buffer + current_byte_in_sector, bytes_to_copy);
+        
+        file_handle->current_file_pos += bytes_to_copy;
+        file_handle->current_offset += bytes_to_copy;
+        bytes_read_total += bytes_to_copy;
 
-        if (start_sector_in_cluster >= sectors_per_cluster) {
+        // // Prepare for next read
+        // start_byte_in_sector = 0;
+        // start_sector_in_cluster++;
+        current_byte_in_sector = (file_handle->current_offset % bytes_per_sector);
+        current_sector_in_cluster = (file_handle->current_offset / bytes_per_sector);
+
+        if (file_handle->current_offset >= bytes_per_cluster) {
             uint32_t next_cluster;
-            fat_error_t res = getNextCluster(current_cluster, &next_cluster);
+            fat_error_t res = getNextCluster(file_handle->current_cluster, &next_cluster);
+
             if (res == FAT_ERROR_END_OF_CHAIN) {
                 // Reached end of file (or chain)
                 break; // Exit loop, even if actual_bytes_to_read hasn't been met (file was shorter)
             } else if (res != FAT_SUCCESS) {
-                uartTxStr("Error getting next cluster for file data.\r\n");
+                // uartTxStr("Error getting next cluster for file data.\r\n");
                 return res;
             }
-            current_cluster = next_cluster;
-            start_sector_in_cluster = 0; // Reset sector counter for new cluster
+            file_handle->current_cluster = next_cluster;
+            file_handle->current_offset = 0;
+            current_sector_in_cluster = 0;
+            current_byte_in_sector = 0;
+        }
+
+        if (bytes_read_total >= actual_bytes_to_read) {
+            break;
+        }
+
+        if (file_handle->current_file_pos >= file_handle->file_size) {
+            break;
         }
 
     }
 
     return FAT_SUCCESS;
+}
+
+static fat_error_t get_file(const char *path, fat_file_info_t *file) {
+    if (path == NULL || *path == '\0') {
+        uartTxStr("Invalid file: "); uartTxStr(path); uartTxStr("\r\n");
+        return FAT_ERROR_BAD_FAT_ENTRY;
+    } 
+
+    // increment path pointer untill we find a '/'
+    // save the string up untill the slash, and increment the pointer again to skip it
+    // search for a directory with the name that was saved
+    // if we find a null terminator instead, look for a file
+    // break if a file is found
+    // break if directory or file cannot be found
+
+    char name_buffer[MAX_FILENAME_LEN];
+    bool final_dir = false;
+    fat_directory_iterator_t dir_iter;
+    fat_init_root_dir_iterator(&dir_iter, g_fat32_volume_info.root_dir_cluster); 
+    fat_file_info_t current_entry;
+
+    // Skip slash at the beginning of path
+    path++;
+
+    unsigned int i = 0;
+
+    while (*path != '\0') {
+        // get current dir/file name
+        while(*path != '/') {
+            if (*path == '\0') {
+                final_dir = true;
+                break;
+            }
+            name_buffer[i] = *path;
+            i++;
+            path++;
+        }
+        name_buffer[i] = '\0'; 
+        
+        // find dir/file name in current directory
+        fat_error_t result;
+        do {
+            result = fat_read_next_dir_entry(&dir_iter, &current_entry);
+
+            if (result == FAT_SUCCESS) {
+                if (strcmp(name_buffer, current_entry.filename) == 0) {
+                    if (current_entry.is_directory && !final_dir) {
+                        fat_init_root_dir_iterator(&dir_iter, current_entry.first_cluster);
+                        break;
+                    } else if (final_dir) {
+                        uartTxStr("Found file\r\n");
+                        *file = current_entry;
+                        return FAT_SUCCESS;
+                    }
+                }
+            } else {
+                if (result == FAT_ERROR_NO_MORE_ENTRIES) {
+                    if (final_dir) {
+                        uartTxStr("Could not find file: ");
+                    } else {
+                        uartTxStr("Could not find directory: ");
+                    }  
+                    uartTxStr(name_buffer); uartTxStr("\r\n");
+                    return result;
+                } else {
+                    uartTxStr("Error finding file");
+                    return result;
+                }
+            }
+
+        } while (result == FAT_SUCCESS);
+    }
+    return FAT_ERROR_NO_MORE_ENTRIES;
+}
+
+uint32_t fat32_open(const char* path, uint8_t mode) {
+    fat_file_info_t file;
+    fat_error_t result =  get_file(path, &file);
+    if (result != FAT_SUCCESS) {
+        uartTxStr("Unable to open file");
+        return MAX_OPEN_FILES + 1;
+    }
+
+    bool found = false;
+    uint32_t i;
+    for (i = 0; i < MAX_OPEN_FILES; i++) {
+        if(open_file_handles[i].is_free == true) {
+            found = true;
+            break;
+        }
+    }
+    if (!found) {
+        uartTxStr("Maximum amount of files open");
+        return MAX_OPEN_FILES + 2;
+    }
+
+    file_handle_t *handle = &open_file_handles[i];
+    handle->cluster_start = file.first_cluster;
+    handle->current_cluster = file.first_cluster;
+    handle->current_offset = 0;
+    handle->file_size = file.file_size;
+    handle->current_file_pos = 0;
+    handle->is_free = false;
+    handle->mode = mode;
+    return i;
+}
+
+bool fat32_close(uint32_t file_id) {
+    if (file_id > MAX_OPEN_FILES) {
+        return false;
+    }
+
+    open_file_handles[file_id].is_free = true;
+    return true;
+}
+
+bool fat32_read(uint32_t file_id, uint8_t *buffer, uint32_t bytes_to_read) {
+    if (file_id > MAX_OPEN_FILES || buffer == NULL) {
+        return false;
+    }
+
+    // uint8_t test_buff[513];
+    // test_buff[512] = '\0';
+
+    fat_error_t result = fat_read_file(file_id, buffer, bytes_to_read);
+    if (result != FAT_SUCCESS) {
+        uartTxDec(result);
+        return false;
+    }
+    // uartTxStr(test_buff);
+    return true;
 }

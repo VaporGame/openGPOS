@@ -57,64 +57,64 @@ static void kernel_main(void) {
     init_malloc();
 
     fat32_init();
-    fat_directory_iterator_t *root_dir_iter = malloc(sizeof(fat_directory_iterator_t));
-    if (root_dir_iter == NULL) {
-        uartTxStr("Failed to allocate root_dir_iter\r\n");
-        return;
-    }
-    fat_init_root_dir_iterator(root_dir_iter, 2); // TODO: make this use actual root dir sector instead of assuming 2
+    // fat_directory_iterator_t *root_dir_iter = malloc(sizeof(fat_directory_iterator_t));
+    // if (root_dir_iter == NULL) {
+    //     uartTxStr("Failed to allocate root_dir_iter\r\n");
+    //     return;
+    // }
+    // fat_init_root_dir_iterator(root_dir_iter, 2); // TODO: make this use actual root dir sector instead of assuming 2
 
 
-    fat_file_info_t *my_file = malloc(sizeof(fat_file_info_t));
-    if (my_file == NULL) {
-        uartTxStr("Failed to allocate my_file\r\n");
-        return;
-    }
+    // fat_file_info_t *my_file = malloc(sizeof(fat_file_info_t));
+    // if (my_file == NULL) {
+    //     uartTxStr("Failed to allocate my_file\r\n");
+    //     return;
+    // }
 
-    fat_error_t result = FAT_SUCCESS;
-    uartTxStr("\r\n");
-    while (result != FAT_ERROR_NO_MORE_ENTRIES) {
-        result = fat_read_next_dir_entry(root_dir_iter, my_file);
+    // fat_error_t result = FAT_SUCCESS;
+    // uartTxStr("\r\n");
+    // while (result != FAT_ERROR_NO_MORE_ENTRIES) {
+    //     result = fat_read_next_dir_entry(root_dir_iter, my_file);
 
-        if (result == FAT_SUCCESS) {
-            if (my_file->is_directory) {
-                uartTxStr("dir "); uartTxStr(my_file->filename); uartTxStr("\r\n");
-                continue;
-            } else {
-                uartTxStr("file "); uartTxStr(my_file->filename); uartTx(' '); uartTxDec(my_file->file_size); uartTxStr("b\r\n"); 
-            }
+    //     if (result == FAT_SUCCESS) {
+    //         if (my_file->is_directory) {
+    //             uartTxStr("dir "); uartTxStr(my_file->filename); uartTxStr("\r\n");
+    //             continue;
+    //         } else {
+    //             uartTxStr("file "); uartTxStr(my_file->filename); uartTx(' '); uartTxDec(my_file->file_size); uartTxStr("b\r\n"); 
+    //         }
 
-            uint32_t file_size = my_file->file_size;
+    //         uint32_t file_size = my_file->file_size;
 
-            uint8_t file_content_buffer[file_size];
-            uint32_t read_size = file_size;
-            if (my_file->file_size < read_size) {
-                read_size = my_file->file_size;
-            }
+    //         uint8_t file_content_buffer[file_size];
+    //         uint32_t read_size = file_size;
+    //         if (my_file->file_size < read_size) {
+    //             read_size = my_file->file_size;
+    //         }
 
-            fat_error_t read_res = fat_read_file(my_file, file_content_buffer, read_size, 0);
-            if (read_res == FAT_SUCCESS) {
-                uartTxStr("content:\r\n");
+    //         fat_error_t read_res = fat_read_file(my_file, file_content_buffer, read_size, 0);
+    //         if (read_res == FAT_SUCCESS) {
+    //             uartTxStr("content:\r\n");
 
-                for (uint32_t i = 0; i < read_size; i++) {
-                    if (file_content_buffer[i] >= 32 && file_content_buffer[i] <= 126) {
-                        uartTx(file_content_buffer[i]);
-                    } else {
-                        uartTx('?');
-                    }
-                }
-                uartTxStr("\r\n\r\n");
-            } else {
-                uartTxStr("Failed to read file\r\n");
-            }
+    //             for (uint32_t i = 0; i < read_size; i++) {
+    //                 if (file_content_buffer[i] >= 32 && file_content_buffer[i] <= 126) {
+    //                     uartTx(file_content_buffer[i]);
+    //                 } else {
+    //                     uartTx('?');
+    //                 }
+    //             }
+    //             uartTxStr("\r\n\r\n");
+    //         } else {
+    //             uartTxStr("Failed to read file\r\n");
+    //         }
 
-        } else if (result != FAT_ERROR_NO_MORE_ENTRIES) {
-            uartTxDec(result);
-        }
-    }
+    //     } else if (result != FAT_ERROR_NO_MORE_ENTRIES) {
+    //         uartTxDec(result);
+    //     }
+    // }
 
-    free(root_dir_iter);
-    free(my_file);
+    // free(root_dir_iter);
+    // free(my_file);
 
     // while((result ) == FAT_SUCCESS) {
     //     uartTxStr(file_info.filename);
@@ -128,7 +128,35 @@ static void kernel_main(void) {
 
     // Show file pls
 
-    
+    uint32_t file_id = fat32_open("/longfilename.txt", 0);
+    uint8_t *buffer1 = (uint8_t *)malloc(sizeof(uint8_t) * 513);
+    buffer1[512] = '\0';
+    uint8_t *buffer2 = (uint8_t *)malloc(sizeof(uint8_t) * 513);
+    buffer2[512] = '\0';
+    bool result = fat32_read(file_id, buffer1, 512);
+
+    uartTxStr("first half\r\n");
+    if (result) {
+        uartTxStr(buffer1);
+    } else {
+        uartTxStr("unable to read file");
+    }
+    uartTxStr("\r\nsecond half\r\n");
+    result = fat32_read(file_id, buffer2, 512);
+    if (result) {
+        uartTxStr(buffer2);
+    } else {
+        uartTxStr("unable to read file");
+    }
+    uartTxStr("\r\n");
+    uartTxStr("Together\r\n");
+    uartTxStr(buffer1);
+    uartTxStr(buffer2);
+    uartTxStr("\r\n");
+
+    free(buffer1);
+    free(buffer2);
+    bool res = fat32_close(file_id);
 
     //uartTxDec(result);
 

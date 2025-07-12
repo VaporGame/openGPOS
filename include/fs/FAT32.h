@@ -41,10 +41,24 @@ typedef struct {
     bool     is_directory;
 } fat_file_info_t;
 
+typedef struct {
+    uint32_t    cluster_start;
+    uint32_t    current_cluster;
+    uint32_t    current_offset;
+    uint32_t    file_size;
+    uint32_t    current_file_pos;
+    bool        is_free;
+    uint8_t     mode;
+} file_handle_t;
+
+uint32_t fat32_open(const char* path, uint8_t mode);
+bool fat32_close(uint32_t file_id);
+bool fat32_read(uint32_t file_id, uint8_t *buffer, uint32_t bytes_to_read);
+
 fat_error_t fat_init_root_dir_iterator(fat_directory_iterator_t *iter, uint32_t start_cluster);
 fat_error_t fat_read_next_dir_entry(fat_directory_iterator_t *iter, fat_file_info_t *file_info_out);
 
-fat_error_t fat_read_file(const fat_file_info_t *file_info, uint8_t *buffer, uint32_t bytes_to_read, uint32_t offset_in_file);
+// fat_error_t fat_read_file(const fat_file_info_t *file_info, uint8_t *buffer, uint32_t bytes_to_read, uint32_t offset_in_file);
 
 bool fat32_init(void);
 
