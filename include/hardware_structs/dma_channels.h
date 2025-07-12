@@ -1,7 +1,7 @@
 #ifndef DMA_CHANNELS_H
 #define DMA_CHANNELS_H
 
-#include <stddef.h>
+#include <stdint.h>
 
 #define DMA_BASE 0x50000000
 
