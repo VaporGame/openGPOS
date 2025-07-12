@@ -33,6 +33,7 @@ set(SOURCES
     ${SRCDIR}/startup_rp2040.c
     ${SRCDIR}/hardware/uart.c
     ${SRCDIR}/hardware/spi.c
+    ${SRCDIR}/hardware/dma.c
     ${SRCDIR}/SD.c
     ${SRCDIR}/hexutils.c
     ${SRCDIR}/fs/FAT32.c
