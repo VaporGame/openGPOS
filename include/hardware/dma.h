@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include <stddef.h>
+#include <stdbool.h>
 
 // transfer request signals
 #define DMA_DREQ_PIO0_TX0   0
@@ -51,26 +52,27 @@
 #define DMA_TREQ_TIMER3     0x3E
 #define DMA_TREQ_PERMANENT  0x3F // use this if you want an unpaced transfer
 
+// dma data size
+#define DMA_SIZE_8BIT 0
+#define DMA_SIZE_16BIT 1
+#define DMA_SIZE_32BIT 2
 
-// control register fields
-#define DMA_CTRL_EN              (1 << 0)
-#define DMA_CTRL_HIGH_PRIO       (1 << 1)
-#define DMA_CTRL_DATA_SIZE_1BYTE (0 << 2)
-#define DMA_CTRL_DATA_SIZE_2BYTE (1 << 2)
-#define DMA_CTRL_DATA_SIZE_4BYTE (2 << 2)
-#define DMA_CTRL_INCR_READ       (1 << 4)
-#define DMA_CTRL_INCR_WRITE      (1 << 5)
-#define DMA_CTRL_CHAIN_TO(x)     (x << 11)
-#define DMA_CTRL_TREQ_SEL(x)     (x << 15)
-#define DMA_CTRL_IRQ_QUIET       (1 << 21)
-#define DMA_CTRL_BSWAP           (1 << 22)
-#define DMA_CTRL_SNIFF_EN        (1 << 23)
-#define DMA_CTRL_BUSY            (1 << 24)
-#define DMA_CTRL_WRITE_ERROR     (1 << 29)
-#define DMA_CTRL_READ_ERROR      (1 << 30)
-#define DMA_CTRL_AHB_ERROR       (1 << 31)
+
+
+typedef uint32_t dma_channel_config_t;
 
 // simple interface for now, TODO expand later
+dma_channel_config_t dma_get_default_config(uint8_t channel);
+void dma_config_set_data_size(dma_channel_config_t *config, uint8_t size);
+void dma_config_set_read_increment(dma_channel_config_t *config, bool set);
+void dma_config_set_write_increment(dma_channel_config_t *config, bool set);
+void dma_config_set_chain(dma_channel_config_t *config, uint8_t channel);
+void dma_config_set_treq(dma_channel_config_t *config, uint8_t treq);
+void dma_config_set_ring(dma_channel_config_t *config, bool write, uint8_t exponent); // the actual size is 2^exponent, 0 for no ring
+
+void dma_channel_configure(uint8_t channel, dma_channel_config_t config, const void *src, void *dst, size_t n, bool start);
+bool dma_channel_busy(uint8_t channel);
+
 void dma_transfer_start(const void *src, void *dst, size_t n, uint8_t channel);
 void dma_transfer_await(uint8_t channel);
 
