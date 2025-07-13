@@ -17,7 +17,7 @@ set(CMAKE_ASM_COMPILER "${TOOLCHAIN}gcc")
 set(CMAKE_OBJCOPY "${TOOLCHAIN}objcopy")
 set(CMAKE_OBJDUMP "${TOOLCHAIN}objdump")
 
-set(CMAKE_C_FLAGS "-mcpu=cortex-m0plus -O3 --specs=nano.specs -ffreestanding -nostdlib --static ")
+set(CMAKE_C_FLAGS "-mcpu=cortex-m0plus -Os --specs=nano.specs -ffreestanding -nostdlib --static ")
 
 set(SOURCES
     ${CMAKE_SOURCE_DIR}/test.c

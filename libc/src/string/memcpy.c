@@ -1,6 +1,6 @@
 #include <libc/string.h>
 #include <stdint.h>
-#include "hardware/dma.h"
+#include "dma/dma.h"
 
 // void *memcpy(void *destination, const void *source, size_t num) {
 //     uint32_t *d = (uint32_t *)destination;

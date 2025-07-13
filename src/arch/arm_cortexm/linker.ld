@@ -47,5 +47,5 @@ SECTIONS
     _sdataf = LOADADDR(.data);          /* Get starting VMA */
 
     __heap_start__ = __bss_end__;
-    __heap_end__ = __stack;
+    __heap_end__ = __heap_start__ + 0x8000;
 }

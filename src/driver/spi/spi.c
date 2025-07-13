@@ -1,4 +1,4 @@
-#include "hardware/spi.h"
+#include "spi/spi.h"
 #include "hardware_structs/spi.h"
 #include "hardware_structs/io_bank0.h"
 #include "hardware_structs/pads_bank0.h"

@@ -4,7 +4,7 @@
 #include <libc/string.h>
 #include <stdbool.h>
 
-#include "hardware/uart.h"
+#include "uart/uart.h"
 
 //==============================================================================
 // TYPES AND CONSTANTS

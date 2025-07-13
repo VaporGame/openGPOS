@@ -1,6 +1,6 @@
-#include "elf.h"
+#include "elf/elf.h"
 #include "fs/FAT32.h"
-#include "hexutils.h"
+#include "util/hexutils.h"
 #include <libc/string.h>
 #include <libc/stdlib.h>
 

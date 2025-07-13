@@ -1,11 +1,11 @@
 #include "fs/FAT32.h"
 #include <stdbool.h>
 #include <stdint.h>
-#include "SD.h"
-#include "hardware/uart.h"
+#include "sd/SD.h"
+#include "uart/uart.h"
 #include <stddef.h>
 #include <libc/string.h>
-#include "hexutils.h"
+#include "util/hexutils.h"
 
 #define MAX_OPEN_FILES 16
 file_handle_t open_file_handles[MAX_OPEN_FILES];

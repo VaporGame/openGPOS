@@ -1,7 +1,7 @@
 #ifndef FAT32_H
 #define FAT32_H
 #include <stdbool.h>
-#include "SD.h"
+#include "sd/SD.h"
 
 #define MAX_LFN_PARTS    20 // Max LFN length is 255 chars / 13 chars per LFN entry = ~19.6. Use 20 for safety.
 #define MAX_UTF8_CHARS_PER_LFN_PART (13 * 3 + 1) // 13 UTF-16 chars * max 3 bytes/UTF8 char + null

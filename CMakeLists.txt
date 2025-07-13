@@ -3,19 +3,20 @@ cmake_minimum_required(VERSION 3.15)
 project(freeGPOS VERSION 0.1)
 
 set(CMAKE_SOURCE_DIR ${CMAKE_CURRENT_LIST_DIR})
-set(PROJECT_BINARY_DIR "${CMAKE_SOURCE_DIR}/build")
+set(PROJECT_BINARY_DIR ${CMAKE_SOURCE_DIR}/build)
 
-set(SRCDIR src)
+set(SRCDIR ${CMAKE_SOURCE_DIR}/src)
+set(RP2040DIR ${SRCDIR}/arch/arm_cortexm/rp2040)
 
-set(BOOT2DIR ${SRCDIR}/boot2)
+set(BOOT2DIR ${RP2040DIR}/boot2)
 set(BOOT2 bootStage2QuadIO)
 set(COMPCRC compCrc32)
 set(CRCVALUE crc)
 
-set(LNKSCRIPT ${CMAKE_SOURCE_DIR}/link.ld)
+set(LNKSCRIPT ${SRCDIR}/arch/arm_cortexm/linker.ld)
 
 set(BUILDDIR ${PROJECT_BINARY_DIR})
-set(BUILDBOOT2DIR ${BUILDDIR}/${BOOT2DIR})
+set(BUILDBOOT2DIR ${BUILDDIR}/boot2)
 
 set(TOOLCHAIN arm-none-eabi-)
 set(CMAKE_C_COMPILER "${TOOLCHAIN}gcc")
@@ -28,29 +29,36 @@ set(UTILS ${CMAKE_SOURCE_DIR}/utils)
 set(CMAKE_C_FLAGS "-mcpu=cortex-m0plus -O3 --specs=nano.specs -ffreestanding -nostdlib")
 
 set(SOURCES
-    ${SRCDIR}/kernel_main.c
-    ${SRCDIR}/system_rp2040.c
-    ${SRCDIR}/startup_rp2040.c
-    ${SRCDIR}/hardware/uart.c
-    ${SRCDIR}/hardware/spi.c
-    ${SRCDIR}/hardware/dma.c
-    ${SRCDIR}/SD.c
-    ${SRCDIR}/hexutils.c
-    ${SRCDIR}/fs/FAT32.c
-    ${SRCDIR}/elf.c
+    ${SRCDIR}/kernel/main.c
+    ${RP2040DIR}/system_rp2040.c
+    ${RP2040DIR}/startup_rp2040.c
 )
 
-file(GLOB_RECURSE LIB_C_FILES
+file(GLOB_RECURSE LIB
+    "${SRCDIR}/lib/*.c"
+)
+list(APPEND SOURCES ${LIB})
+
+file(GLOB_RECURSE LIB_C
     "${CMAKE_SOURCE_DIR}/libc/src/*.c"
 )
+list(APPEND SOURCES ${LIB_C})
 
-list(APPEND SOURCES ${LIB_C_FILES})
+file(GLOB_RECURSE DRIVER
+    "${SRCDIR}/driver/*.c"
+)
+list(APPEND SOURCES ${DRIVER})
 
-include_directories("${CMAKE_SOURCE_DIR}/include/")
+include_directories(
+    ${SRCDIR}/lib
+    ${SRCDIR}/driver
+    ${SRCDIR}/arch/arm_cortexm/rp2040/
+    ${CMAKE_SOURCE_DIR}/libc/include
+)
 
 # Compile bootStage2 with linking
 add_executable(${BOOT2}.elf ${BOOT2DIR}/${BOOT2}.c)
-target_link_options(${BOOT2}.elf PUBLIC -T ${LNKSCRIPT})
+target_link_options(${BOOT2}.elf PRIVATE -T ${LNKSCRIPT})
 set_target_properties(${BOOT2}.elf PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${BUILDBOOT2DIR}/"
 )
@@ -72,10 +80,8 @@ add_custom_command(
 
 # Compile the project and link everything into an elf file
 add_executable(${PROJECT_NAME}.elf ${SOURCES} ${BOOT2DIR}/${BOOT2}.c ${BUILDBOOT2DIR}/${CRCVALUE}.c)
-target_link_options(${PROJECT_NAME}.elf PUBLIC -T ${LNKSCRIPT})
+target_link_options(${PROJECT_NAME}.elf PRIVATE -T ${LNKSCRIPT})
 target_link_libraries(${PROJECT_NAME}.elf PUBLIC gcc)
-target_include_directories(${PROJECT_NAME}.elf PUBLIC 
-                            ${CMAKE_SOURCE_DIR}/libc/include)
 
 # Convert elf to bin to uf2 file
 add_custom_target(${PROJECT_NAME}.uf2 ALL

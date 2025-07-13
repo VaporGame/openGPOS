@@ -16,7 +16,7 @@ features
 - [ ] USB serial (planned)
 - [x] SD library (WIP)
 - [x] FAT32 library (WIP)
-- [ ] ELF support
+- [x] ELF support (WIP)
 
 TODO:
 - [ ] Replace Cmake with a python script

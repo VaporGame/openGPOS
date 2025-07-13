@@ -4,14 +4,14 @@
 #include "hardware_structs/io_bank0.h"
 #include "hardware_structs/sio.h"
 #include "hardware_structs/dma_channels.h"
-#include "hardware/uart.h"
-#include "hardware/spi.h"
-#include "SD.h"
-#include "hexutils.h"
+#include "uart/uart.h"
+#include "spi/spi.h"
+#include "sd/SD.h"
+#include "util/hexutils.h"
 #include "fs/FAT32.h"
 #include <libc/stdlib.h>
-#include "hardware/dma.h"
-#include "elf.h"
+#include "dma/dma.h"
+#include "elf/elf.h"
 
 typedef void (*EntryFunction_t)(void);
 

@@ -1,8 +1,8 @@
-#include "hexutils.h"
+#include "util/hexutils.h"
 #include <stdint.h>
 #include <stdbool.h>
 
-#include "hardware/uart.h"
+#include "uart/uart.h"
 
 void hexToStr(char *str, uint32_t n) {
     int i, hb;

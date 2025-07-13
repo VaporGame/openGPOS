@@ -1,9 +1,9 @@
-#include "hardware/uart.h"
+#include "uart/uart.h"
 #include "hardware_structs/uart.h"
 #include "hardware_structs/io_bank0.h"
 #include "hardware_structs/clocks.h"
 #include <stdint.h>
-#include "hexutils.h"
+#include "util/hexutils.h"
 #include <stddef.h>
 
 void uartTx( unsigned char x) {

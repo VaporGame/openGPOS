@@ -1,10 +1,10 @@
-#include "SD.h"
+#include "sd/SD.h"
 #include <stdbool.h>
 #include <stdint.h>
-#include "hardware/uart.h"
-#include "hardware/spi.h"
+#include "uart/uart.h"
+#include "spi/spi.h"
 #include "hardware_structs/sio.h"
-#include "hexutils.h"
+#include "util/hexutils.h"
 
 extern void usSleep(uint64_t us);
 

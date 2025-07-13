@@ -1,4 +1,4 @@
-#include <hardware/dma.h>
+#include <dma/dma.h>
 #include <hardware_structs/dma_channels.h>
 
 extern void usSleep(uint64_t us);
