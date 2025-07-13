@@ -1,6 +1,8 @@
 #include <hardware/dma.h>
 #include <hardware_structs/dma_channels.h>
 
+extern void usSleep(uint64_t us);
+
 void dma_transfer_start(void *src, void *dst, size_t n, uint8_t channel) {
     dma_transfer_await(channel); // wait for channel to become not busy
     // use alias 0
@@ -18,5 +20,5 @@ void dma_transfer_start(void *src, void *dst, size_t n, uint8_t channel) {
 
 void dma_transfer_await(uint8_t channel) {
     // use alias 1 just to be safe
-    while(dma_channels[channel].al1.CTRL & DMA_CTRL_BUSY);
+    while(dma_channels[channel].al1.CTRL & DMA_CTRL_BUSY) {usSleep(1000);}
 }
