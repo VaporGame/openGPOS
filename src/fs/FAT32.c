@@ -652,12 +652,10 @@ static fat_error_t get_file(const char *path, fat_file_info_t *file) {
     fat_init_root_dir_iterator(&dir_iter, g_fat32_volume_info.root_dir_cluster); 
     fat_file_info_t current_entry;
 
-    // Skip slash at the beginning of path
-    path++;
-
-    unsigned int i = 0;
-
     while (*path != '\0') {
+        unsigned int i = 0;
+        path++;
+
         // get current dir/file name
         while(*path != '/') {
             if (*path == '\0') {
@@ -669,31 +667,27 @@ static fat_error_t get_file(const char *path, fat_file_info_t *file) {
             path++;
         }
         name_buffer[i] = '\0'; 
-        
+
         // find dir/file name in current directory
-        fat_error_t result;
+        fat_error_t result = FAT_SUCCESS;
         do {
             result = fat_read_next_dir_entry(&dir_iter, &current_entry);
 
             if (result == FAT_SUCCESS) {
                 if (strcmp(name_buffer, current_entry.filename) == 0) {
                     if (current_entry.is_directory && !final_dir) {
+                        // uartTxStr("found dir\r\n");
                         fat_init_root_dir_iterator(&dir_iter, current_entry.first_cluster);
                         break;
                     } else if (final_dir) {
-                        uartTxStr("Found file\r\n");
+                        // uartTxStr("Found file\r\n");
                         *file = current_entry;
                         return FAT_SUCCESS;
                     }
                 }
             } else {
                 if (result == FAT_ERROR_NO_MORE_ENTRIES) {
-                    if (final_dir) {
-                        uartTxStr("Could not find file: ");
-                    } else {
-                        uartTxStr("Could not find directory: ");
-                    }  
-                    uartTxStr(name_buffer); uartTxStr("\r\n");
+                    uartTxStr(name_buffer); uartTxStr(": No such file or directory\r\n");
                     return result;
                 } else {
                     uartTxStr("Error finding file");
