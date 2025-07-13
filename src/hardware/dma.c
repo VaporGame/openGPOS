@@ -3,7 +3,7 @@
 
 extern void usSleep(uint64_t us);
 
-void dma_transfer_start(void *src, void *dst, size_t n, uint8_t channel) {
+void dma_transfer_start(const void *src, void *dst, size_t n, uint8_t channel) {
     dma_transfer_await(channel); // wait for channel to become not busy
     // use alias 0
     dma_channels[channel].al0.READ_ADDR = (uint32_t)src;

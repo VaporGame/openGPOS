@@ -71,7 +71,7 @@
 #define DMA_CTRL_AHB_ERROR       (1 << 31)
 
 // simple interface for now, TODO expand later
-void dma_transfer_start(void *src, void *dst, size_t n, uint8_t channel);
+void dma_transfer_start(const void *src, void *dst, size_t n, uint8_t channel);
 void dma_transfer_await(uint8_t channel);
 
 #endif //DMA_H
