@@ -1,3 +1,4 @@
 build/
 .vscode
 freeGPOS.uf2
+programs/out/

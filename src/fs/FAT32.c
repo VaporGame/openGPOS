@@ -5,6 +5,7 @@
 #include "hardware/uart.h"
 #include <stddef.h>
 #include <libc/string.h>
+#include "hexutils.h"
 
 #define MAX_OPEN_FILES 16
 file_handle_t open_file_handles[MAX_OPEN_FILES];
@@ -103,18 +104,6 @@ static bool write_sectors(uint32_t lba, uint32_t count, uint8_t *buffer) {
 }
 
 // TODO: IMPLEMENT MULTI BLOCK READING SD COMMANDS
-
-static uint32_t read_le32(const uint8_t *data, uint16_t offset) {
-    return data[offset]         |
-           (data[offset + 1] << 8)  |
-           (data[offset + 2] << 16) |
-           (data[offset + 3] << 24);
-}
-
-static uint16_t read_le16(const uint8_t *data, uint16_t offset) {
-    return data[offset]         |
-           (data[offset + 1] << 8);
-}
 
 static bool parseMBR(void) {
     uint8_t block_data[512];
@@ -756,4 +745,8 @@ bool fat32_read(uint32_t file_id, uint8_t *buffer, uint32_t bytes_to_read) {
     }
     // uartTxStr(test_buff);
     return true;
+}
+
+uint32_t fat32_get_size(uint32_t file_id) {
+    return open_file_handles[file_id].file_size;
 }

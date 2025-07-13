@@ -59,7 +59,7 @@ void spi_init(void) {
     //frame format is motorola SPI by default
     //assume SPI mode 0
     //SPI0_SSPCR0 = ((1 << 6) | (1 << 7)); //SPO = 0, SPH = 0
-    spi0_hw->CPSR = 32;
+    spi0_hw->CPSR = 254;
     //we will want to change this afterwards to 2 to get a 6mhz clock
     //device is master by default
     spi0_hw->CR1 &= ~(1 << 2);
@@ -81,4 +81,8 @@ void spi_init(void) {
     pads_bank0_hw->gpio[19] = (1 << 1) | (1 << 8);
 
     spi0_hw->CR1 |= (1 << 1); //enable SSP
+}
+
+void spi_set_speed(uint8_t divisor) {
+    spi0_hw->CPSR = divisor;
 }

@@ -67,3 +67,15 @@ void intToDec(char* str, uint32_t n) { // Trims zeroes
     }
     str[j] = '\0';
 }
+
+uint32_t read_le32(const uint8_t *data, uint16_t offset) {
+    return data[offset]         |
+           (data[offset + 1] << 8)  |
+           (data[offset + 2] << 16) |
+           (data[offset + 3] << 24);
+}
+
+uint16_t read_le16(const uint8_t *data, uint16_t offset) {
+    return data[offset]         |
+           (data[offset + 1] << 8);
+}

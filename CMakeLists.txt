@@ -37,6 +37,7 @@ set(SOURCES
     ${SRCDIR}/SD.c
     ${SRCDIR}/hexutils.c
     ${SRCDIR}/fs/FAT32.c
+    ${SRCDIR}/elf.c
 )
 
 file(GLOB_RECURSE LIB_C_FILES

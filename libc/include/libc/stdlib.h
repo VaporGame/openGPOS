@@ -3,9 +3,9 @@
 #include <stddef.h>
 
 void init_malloc();
-void* malloc(size_t size);
-void* realloc(void* ptr, size_t size);
-void free(void* ptr);
+void* malloc(size_t size) __attribute__((malloc)) __attribute__((alloc_size(1)));
+void* realloc(void* ptr, size_t size) __attribute__((alloc_size(2)));
+void free(void* ptr) __attribute__((nonnull(1)));
 
 void dumpHeap();
 

@@ -62,4 +62,6 @@ fat_error_t fat_read_next_dir_entry(fat_directory_iterator_t *iter, fat_file_inf
 
 bool fat32_init(void);
 
+uint32_t fat32_get_size(uint32_t file_id);
+
 #endif //FAT32_H

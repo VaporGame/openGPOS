@@ -192,6 +192,7 @@ bool SDInit(void) {
         deassertCS();
         return false;
     }
+    spi_set_speed(8); // Can maybe go to 4 (50MHz)
     return true;
 }
 
