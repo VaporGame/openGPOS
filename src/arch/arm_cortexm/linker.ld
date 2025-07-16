@@ -20,7 +20,7 @@ SECTIONS
     .text :
     {
         KEEP(*(.vector*))
-        KEEP(*(.text*))
+        *(.text*)
     } > flash
     
     .rodata :

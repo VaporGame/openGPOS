@@ -7,7 +7,7 @@
 
 bool SDInit(void);
 
-bool SDReadCSD(uint8_t *csd_buffer);
+//uint32_t SDReadCSD(uint8_t *csd_buffer);
 bool sdReadBlock(uint32_t block_address, uint8_t *data_buffer);
 bool sdWriteBlock(uint32_t block_address, uint8_t *data_buffer);
 

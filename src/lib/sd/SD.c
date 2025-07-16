@@ -132,7 +132,7 @@ bool SDInit(void) {
     //send ACMD41 with dummy crc
     //repeat for 5 seconds or untill card responds with 0x00 (not in idle state)
 
-    uint16_t acmd41_timeout = 1000; //could be decreased to 1000
+    uint16_t acmd41_timeout = 5000; //could be decreased to 1000
     uint8_t acmd41_r1 = 0xFF;
 
     do {
@@ -195,45 +195,39 @@ bool SDInit(void) {
     return true;
 }
 
-bool SDReadCSD(uint8_t *csd_buffer) {
-    //uartTxStr("Reading CSD register...\r\n");
+// uint32_t SDReadCSD(uint8_t *csd_buffer) {
+//     //uartTxStr("Reading CSD register...\r\n");
 
-    // CMD9 (SEND_CSD)
-    SDSendCommand(0x49, 0x00000000, 0x01);
+//     // CMD9 (SEND_CSD)
+//     SDSendCommand(0x49, 0x00000000, 0x01);
 
-    uint8_t cmd9_r1 = read_r1_response(0xFF);
-    if (cmd9_r1 != 0x00) {
-        // uartTxStr("CMD9 FAIL\r\n");
-        deassertCS();
-        return false;
-    }
+//     uint8_t cmd9_r1 = read_r1_response(0xFF);
+//     if (cmd9_r1 != 0x00) {
+//         // uartTxStr("CMD9 FAIL\r\n");
+//         deassertCS();
+//         return 0;
+//     }
 
-    // Read 16-byte CSD data block
-    if (!read_data_block(csd_buffer, 16, 0xFFFF)) {
-        // uartTxStr("Failed to read CSD data block\r\n");
-        deassertCS();
-        return false;
-    }
+//     // Read 16-byte CSD data block
+//     if (!read_data_block(csd_buffer, 16, 0xFFFF)) {
+//         // uartTxStr("Failed to read CSD data block\r\n");
+//         deassertCS();
+//         return 0;
+//     }
 
-    deassertCS();
+//     deassertCS();
 
-    //Parse CSD to get card capacity
-    if (((csd_buffer[0] >> 6) & 0x03) == 0x1) { // CSD_STRUCTURE == 1 (CSD Version 2.0)
-        uint32_t c_size = ((csd_buffer[7] & 0x3F) << 16) | (csd_buffer[8] << 8) | csd_buffer[9];
+//     //Parse CSD to get card capacity
+//     if (((csd_buffer[0] >> 6) & 0x03) == 0x1) { // CSD_STRUCTURE == 1 (CSD Version 2.0)
+//         uint32_t c_size = ((csd_buffer[7] & 0x3F) << 16) | (csd_buffer[8] << 8) | csd_buffer[9];
 
-        uint32_t capacity_bytes = (c_size + 1) / 2; // 512KB blocks
-        uartTxStr("Capacity: ");
-        // char hex2[11];
-        // intToDec(hex2, capacity_bytes);
-        // uartTxStr(hex2);
-        uartTxDec(capacity_bytes);
-        uartTxStr(" MB\r\n");
-    } else {
-        // uartTxStr("CSD Version 1.0 detected (or unknown). Capacity calculation differs.\r\n");
-    }
+//         uint32_t capacity_bytes = (c_size + 1) / 2; // 512KB blocks
+//         return capacity_bytes;
 
-    return true;
-}
+//     }
+
+//     return 0;
+// }
 
 // TODO: IMPLEMENT MULTI BLOCK READING SD COMMANDS
 

@@ -51,7 +51,7 @@ typedef struct {
     uint8_t     mode;
 } file_handle_t;
 
-uint32_t fat32_open(const char* path, uint8_t mode);
+uint32_t fat32_open(const char* path, const uint8_t mode);
 bool fat32_close(uint32_t file_id);
 bool fat32_read(uint32_t file_id, uint8_t *buffer, uint32_t bytes_to_read);
 

@@ -37,12 +37,18 @@ set(SOURCES
 file(GLOB_RECURSE LIB
     "${SRCDIR}/lib/*.c"
 )
-list(APPEND SOURCES ${LIB})
+# list(APPEND SOURCES ${LIB})
+
+add_library(lib STATIC ${LIB})
+target_include_directories(lib PUBLIC ${CMAKE_SOURCE_DIR}/lib)
 
 file(GLOB_RECURSE LIB_C
     "${CMAKE_SOURCE_DIR}/libc/src/*.c"
 )
-list(APPEND SOURCES ${LIB_C})
+#list(APPEND SOURCES ${LIB_C})
+
+add_library(libc STATIC ${LIB_C})
+target_include_directories(libc PUBLIC ${CMAKE_SOURCE_DIR}/libc/include)
 
 file(GLOB_RECURSE DRIVER
     "${SRCDIR}/driver/*.c"
@@ -81,7 +87,7 @@ add_custom_command(
 # Compile the project and link everything into an elf file
 add_executable(${PROJECT_NAME}.elf ${SOURCES} ${BOOT2DIR}/${BOOT2}.c ${BUILDBOOT2DIR}/${CRCVALUE}.c)
 target_link_options(${PROJECT_NAME}.elf PRIVATE -T ${LNKSCRIPT} -Wl,--gc-sections,-Map=${CMAKE_BINARY_DIR}/map.map)
-target_link_libraries(${PROJECT_NAME}.elf PUBLIC gcc)
+target_link_libraries(${PROJECT_NAME}.elf PUBLIC gcc libc lib)
 
 # Convert elf to bin to uf2 file
 add_custom_target(${PROJECT_NAME}.uf2 ALL

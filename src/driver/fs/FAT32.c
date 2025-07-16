@@ -270,15 +270,14 @@ static uint8_t fat_read_cluster(uint32_t cluster, uint8_t *buffer) {
         return FAT_ERROR_INVALID_CLUSTER;
     }
     uint32_t sectors_to_read = g_fat32_volume_info.sectors_per_cluster;
-    bool res = read_sectors(lba, sectors_to_read, buffer);
-    if (res != 0) {
+    if (!read_sectors(lba, sectors_to_read, buffer)) {
         //uartTxStr("Failed to read cluster\r\n");
         return FAT_ERROR_READ_FAIL;
     }
     return FAT_SUCCESS;
 }
 
-static void fat_sfn_to_string(uint8_t *sfn_name, char *out_name) {
+static void fat_sfn_to_string(const uint8_t *sfn_name, char *out_name) {
     uint16_t i, j;
     for (i = 0; i < 8 && sfn_name[i] != ' '; i++) {
         out_name[i] = sfn_name[i];
@@ -295,7 +294,7 @@ static void fat_sfn_to_string(uint8_t *sfn_name, char *out_name) {
 
 static uint8_t fat_sfn_checksum(const uint8_t *sfn_name) {
     uint8_t sum = 0;
-    for (int i = 11; i > 0; i--) {
+    for (uint8_t i = 11; i > 0; i--) {
         sum = ((sum & 1) ? 0x80 : 0) + (sum >> 1) + *sfn_name++;
     }
     return sum;
@@ -411,9 +410,7 @@ fat_error_t fat_read_next_dir_entry(fat_directory_iterator_t *iter, fat_file_inf
         }
 
         // Check for deleted entry
-        if (first_byte == 0xE5) {
-            continue; // Skip
-        }
+        if (first_byte == 0xE5) continue; // Skip
 
         // Check for LFN entry
         if ((entry->sfn.DIR_Attr & FAT_ATTR_LFN) == FAT_ATTR_LFN) {
@@ -597,7 +594,7 @@ static fat_error_t fat_read_file(uint32_t file_id, uint8_t *buffer, uint32_t byt
 }
 
 static fat_error_t get_file(const char *path, fat_file_info_t *file) {
-    if (path == NULL || *path == '\0') {
+    if (path == NULL) {
         //uartTxStr("Invalid file: "); uartTxStr(path); uartTxStr("\r\n");
         return FAT_ERROR_BAD_FAT_ENTRY;
     } 
@@ -660,9 +657,9 @@ static fat_error_t get_file(const char *path, fat_file_info_t *file) {
     return FAT_ERROR_NO_MORE_ENTRIES;
 }
 
-uint32_t fat32_open(const char* path, uint8_t mode) {
+uint32_t fat32_open(const char* path, const uint8_t mode) {
     fat_file_info_t file;
-    fat_error_t result =  get_file(path, &file);
+    fat_error_t result = get_file(path, &file);
     if (result != FAT_SUCCESS) {
         //uartTxStr("Unable to open file");
         return MAX_OPEN_FILES + 1;
