@@ -12,7 +12,7 @@ void uartTx( unsigned char x) {
 }
 
 void uartTxStr(unsigned const char *x) {
-    while(*x++ != '\0') {
+    while(*x != '\0') {
         uartTx(*x);
         x++;
     }
