@@ -5,8 +5,9 @@
 #include "spi/spi.h"
 #include "hardware_structs/sio.h"
 #include "util/hexutils.h"
+#include <libc/unistd.h>
 
-extern void usSleep(uint64_t us);
+// extern void usSleep(uint64_t us);
 
 static void deassertCS() {
     sio_hw->OUT_SET |= 1 << 9; // Deassert CS
@@ -56,11 +57,11 @@ static bool read_data_block(uint8_t *buffer, uint16_t count, uint16_t timeout_va
     } while (token == 0xFF && timeout > 0);
 
     if (timeout == 0) {
-        uartTxStr("Data block read timeout (no start token)\r\n");
+        // uartTxStr("Data block read timeout (no start token)\r\n");
         return false;
     }
     if (token != 0xFE) {
-        uartTxStr("Unexpected data start token\r\n");
+        // uartTxStr("Unexpected data start token\r\n");
         return false;
     }
 
@@ -80,8 +81,8 @@ static bool read_data_block(uint8_t *buffer, uint16_t count, uint16_t timeout_va
 } 
 
 bool SDInit(void) {
-    uartTxStr("initializing SD card ");
-    usSleep(10000); //10ms, let sd card stabilize
+    // uartTxStr("initializing SD card ");
+    usleep(10000); //10ms, let sd card stabilize
 
     sio_hw->OUT_SET |= 1 << 9;
     for(uint8_t i = 0; i < 10; i++) {
@@ -91,11 +92,9 @@ bool SDInit(void) {
     SDSendCommand(0x40, 0x00000000, 0x95);
     uint8_t cmd0_r1 = read_r1_response(0xFF);
     
-    if (cmd0_r1 == 0x01) {
-        uartTxStr("[OK]\r\n");
-    } else {
+    if (cmd0_r1 != 0x01) {
         deassertCS();
-        uartTxStr("[FAIL]\r\n");
+        // uartTxStr("[FAIL]\r\n");
         return false;
     }
 
@@ -114,8 +113,8 @@ bool SDInit(void) {
         if(r7_data[2] == 0x01 && r7_data[3] == 0xAA) {
             //uartTxStr("CMD8 OK\r\n");
         } else {
-            uartTxStr("CMD8 R1 OK, but incorrect data pattern. Card unusable\r\n");
-            deassertCS();
+            // uartTxStr("CMD8 R1 OK, but incorrect data pattern. Card unusable\r\n");
+            //deassertCS();
             return false;
         }
 
@@ -124,7 +123,7 @@ bool SDInit(void) {
         deassertCS();
         return false;
     } else {
-        uartTxStr("CMD8 Unexpected R1 response\r\n");
+        // uartTxStr("CMD8 Unexpected R1 response\r\n");
         deassertCS();
         return false;
     }
@@ -133,7 +132,7 @@ bool SDInit(void) {
     //send ACMD41 with dummy crc
     //repeat for 5 seconds or untill card responds with 0x00 (not in idle state)
 
-    uint16_t acmd41_timeout = 5000; //could be decreased to 1000
+    uint16_t acmd41_timeout = 1000; //could be decreased to 1000
     uint8_t acmd41_r1 = 0xFF;
 
     do {
@@ -142,8 +141,8 @@ bool SDInit(void) {
         deassertCS();
 
         if (cmd55_r1 != 0x01) {
-            uartTxStr("CMD55 unexpected R1 response\r\n");
-            uartTxStr("Aborting ACMD41 loop\r\n");
+            // uartTxStr("CMD55 unexpected R1 response\r\n");
+            // uartTxStr("Aborting ACMD41 loop\r\n");
             return false;
         }
 
@@ -158,11 +157,11 @@ bool SDInit(void) {
         }
 
         acmd41_timeout--;
-        usSleep(1000);
+        usleep(1000);
     } while (acmd41_timeout > 0);
 
     if (acmd41_timeout == 0) {
-        uartTxStr("ACMD41 FAIL (timeout)\r\n");
+        // uartTxStr("ACMD41 FAIL (timeout)\r\n");
         return false;
     }
     
@@ -183,12 +182,12 @@ bool SDInit(void) {
         if (ocr_data[0] & 0x40) {
             //uartTxStr("CMD58 OK: Card is SDHC/SDXC\r\n");
         } else {
-            uartTxStr("CMD58 OK: Card is Standard Capacity, unsupported, this should never happen");
+            // uartTxStr("CMD58 OK: Card is Standard Capacity, unsupported, this should never happen");
             deassertCS();
             return false;
         }
     } else {
-        uartTxStr("CMD58 FAIL");
+        // uartTxStr("CMD58 FAIL");
         deassertCS();
         return false;
     }
@@ -204,14 +203,14 @@ bool SDReadCSD(uint8_t *csd_buffer) {
 
     uint8_t cmd9_r1 = read_r1_response(0xFF);
     if (cmd9_r1 != 0x00) {
-        uartTxStr("CMD9 FAIL\r\n");
+        // uartTxStr("CMD9 FAIL\r\n");
         deassertCS();
         return false;
     }
 
     // Read 16-byte CSD data block
     if (!read_data_block(csd_buffer, 16, 0xFFFF)) {
-        uartTxStr("Failed to read CSD data block\r\n");
+        // uartTxStr("Failed to read CSD data block\r\n");
         deassertCS();
         return false;
     }
@@ -230,7 +229,7 @@ bool SDReadCSD(uint8_t *csd_buffer) {
         uartTxDec(capacity_bytes);
         uartTxStr(" MB\r\n");
     } else {
-        uartTxStr("CSD Version 1.0 detected (or unknown). Capacity calculation differs.\r\n");
+        // uartTxStr("CSD Version 1.0 detected (or unknown). Capacity calculation differs.\r\n");
     }
 
     return true;
@@ -247,13 +246,13 @@ bool sdReadBlock(uint32_t block_address, uint8_t *data_buffer) {
 
     uint8_t cmd17_r1 = read_r1_response(0xFF);
     if (cmd17_r1 != 0x00) {
-        uartTxStr("CMD17 FAIL\r\n");
+        // uartTxStr("CMD17 FAIL\r\n");
         deassertCS();
         return false;
     }
 
     if (!read_data_block(data_buffer, 512, 0xFFFF)) {
-        uartTxStr("Failed to read data block\r\n");
+        // uartTxStr("Failed to read data block\r\n");
         deassertCS();
         return false;
     }
@@ -270,7 +269,7 @@ static bool sdWaitForNotBusy(uint32_t timeout_ms) {
     while (spi_read_byte() == 0x00) { // SD card holds DO low (0x00) when busy
         timeout_counter++;
         if (timeout_counter > MAX_TIMEOUT_COUNT) {
-            uartTxStr("SD card busy timeout!\r\n");
+            // uartTxStr("SD card busy timeout!\r\n");
             return false; // Timeout occurred
         }
     }
@@ -286,7 +285,7 @@ bool sdWriteBlock(uint32_t block_address, uint8_t *data_buffer) {
 
     uint8_t cmd24_r1 = read_r1_response(0xFF);
     if (cmd24_r1 != 0x00) {
-        uartTxStr("CMD24 FAIL\r\n");
+        // uartTxStr("CMD24 FAIL\r\n");
         deassertCS();
         return false;
     }
@@ -309,7 +308,7 @@ bool sdWriteBlock(uint32_t block_address, uint8_t *data_buffer) {
     }
 
     if ((data_response & 0x1F) != 0x05) { // Check for data accepted (0b00000101)
-        uartTxStr("Data write response error");
+        // uartTxStr("Data write response error");
         deassertCS();
         return false;
     }
@@ -330,10 +329,10 @@ bool SDShutdown(void) {
     
     if (cmd0_r1 == 0x01) {
         deassertCS();
-        uartTxStr("SD Card idle\r\n");
+        //uartTxStr("SD Card idle\r\n");
         return true;
     } else {
-        uartTxStr("Failed to bring SD card into idle state\r\n");
+        //uartTxStr("Failed to bring SD card into idle state\r\n");
         return false;
     }
 }

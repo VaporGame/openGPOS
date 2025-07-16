@@ -3,6 +3,7 @@
 #include "util/hexutils.h"
 #include <libc/string.h>
 #include <libc/stdlib.h>
+#include "uart/uart.h"
 
 typedef struct {
     uint32_t e_entry;
@@ -82,6 +83,7 @@ uint32_t loadELF(const char *path) {
         // that p_vaddr will be in ascending order
 
         void* destination_addr = (void*)p_vaddr;
+        
 
         // Copy into memory
         memcpy(destination_addr, (const void*)data + p_offset, p_filesz);
@@ -89,7 +91,7 @@ uint32_t loadELF(const char *path) {
         // Zero initialize the BSS
         if (p_memsz > p_filesz) {
             memset((void*)((uintptr_t)destination_addr + p_filesz), 0, p_memsz - p_filesz);
-        }
+        } 
     }
     free(data);
     return e_entry;

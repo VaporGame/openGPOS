@@ -12,22 +12,23 @@
 #include <libc/stdlib.h>
 #include "dma/dma.h"
 #include "elf/elf.h"
+#include <libc/unistd.h>
 
-typedef void (*EntryFunction_t)(void);
+// typedef void (*EntryFunction_t)(void);
 
 // Declare usSleep function
-extern void usSleep(uint64_t us);
+// extern void usSleep(uint64_t us);
 
-static void blink_forever(void) {
-    io_bank0_hw->gpio[25].CTRL = 5;
-    sio_hw->OE_SET |= 1 << 25; // Set output enable for GPIO 25 in SIO
+// static void blink_forever(void) {
+//     io_bank0_hw->gpio[25].CTRL = 5;
+//     sio_hw->OE_SET |= 1 << 25; // Set output enable for GPIO 25 in SIO
 
-    while (1)
-    {
-        usSleep(500000); // Wait for 0.5sec
-        sio_hw->OUT_XOR |= 1 << 25;  // Flip output for GPIO 25
-    }
-}
+//     while (1)
+//     {
+//         usleep(500000); // Wait for 0.5sec
+//         sio_hw->OUT_XOR |= 1 << 25;  // Flip output for GPIO 25
+//     }
+// }
 
 static void resetSubsys(void) {
     resets_hw->RESET &= ~(1 << 5); // Bring IO_BANK0 out of reset state
@@ -57,17 +58,17 @@ static void kernel_main(void) {
     spi_init();
 
     if(!SDInit()) {
-        uartTxStr("Failed to initialize SD card\r\nCannot continue booting\r\n");
+        uartTxStr("Failed to initialize SD card\r\n");
         return;
     }
     init_malloc();
     fat32_init();
 
-    uint32_t entry = loadELF("/testProg.elf");
-    EntryFunction_t start = (EntryFunction_t)(uintptr_t)entry;
+    // uint32_t entry = loadELF("/testProg.elf");
+    // EntryFunction_t start = (EntryFunction_t)(uintptr_t)entry;
 
-    start();
-    while(1);
+    // start();
+    // while(1);
     
     // uint32_t file_id = fat32_open("/dir1/dir2/file.txt", 0);
     // uint8_t *buffer1 = (uint8_t *)malloc(sizeof(uint8_t) * 15);
@@ -98,9 +99,9 @@ static void kernel_main(void) {
 
     // uartTxStr("Bringing SD card into idle state\r\n");
     while(!SDShutdown()) {
-        usSleep(100000);
+        usleep(100000);
     }
-    while (true) {}
+    for (;;);
 }
 
 // Main entry point

@@ -5,6 +5,7 @@
 #include "hardware_structs/sio.h"
 
 #include <libc/string.h>
+#include <libc/unistd.h>
 
 // Type of vector table entry
 typedef void (*vectFunc) (void);
@@ -59,7 +60,7 @@ void rtcIrq             () __attribute__((weak, alias("defaultHandler")));
 extern void SystemInit(void);
 
 // Declare usSleep function
-extern void usSleep(uint64_t us);
+//extern void usSleep(uint64_t us);
 
 // Declare main function
 extern int main(void);
@@ -142,7 +143,7 @@ void defaultHandler()
 
     while (true)
     {
-        usSleep(50000); // Wait for 0.05sec
+        usleep(50000); // Wait for 0.05sec
         sio_hw->OUT_XOR |= 1 << 25; // Flip output for GPIO 25
     }
 }

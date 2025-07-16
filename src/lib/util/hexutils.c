@@ -2,40 +2,53 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-#include "uart/uart.h"
+// void hexToStr(char *str, uint32_t n) {
+//     int i, hb;
+
+//     for (i = 0; i < 8; i++) {
+//         hb = n >> (7 - i) * 4;
+//         hb &= 0x0F;
+
+//         if (hb > 9) {
+//             str[i] = (char)(hb + 'A' - 10);
+//         } else {
+//             str[i] = (char)(hb + '0');
+//         }
+//     }
+//     str[8] = 0;
+// }
+
+static const char hex_digits[] = "0123456789ABCDEF";
 
 void hexToStr(char *str, uint32_t n) {
-    int i, hb;
-
-    for (i = 0; i < 8; i++) {
-        hb = n >> (7 - i) * 4;
-        hb &= 0x0F;
-
-        if (hb > 9) {
-            str[i] = (char)(hb + 'A' - 10);
-        } else {
-            str[i] = (char)(hb + '0');
-        }
-        str[8] = 0;
+    for (uint8_t i = 0; i < 8; i++) {
+        str[i] = hex_digits[(n >> (28 - i * 4)) & 0xF];
     }
+    str[8] = '\0';
 }
 
+// void byteToStr(char *str, uint8_t n) {
+//     unsigned char nb;
+
+//     nb = (n >> 4) & 0x0F;
+//     if(nb < 10) {
+//         str[0] = nb + '0';
+//     } else {
+//         str[0] = nb - 10 + 'A';
+//     }
+
+//     nb = n & 0x0F;
+//     if(nb < 10) {
+//         str[1] = nb + '0';
+//     } else {
+//         str[1] = nb - 10 + 'A';
+//     }
+//     str[2] = '\0';
+// }
+
 void byteToStr(char *str, uint8_t n) {
-    unsigned char nb;
-
-    nb = (n >> 4) & 0x0F;
-    if(nb < 10) {
-        str[0] = nb + '0';
-    } else {
-        str[0] = nb - 10 + 'A';
-    }
-
-    nb = n & 0x0F;
-    if(nb < 10) {
-        str[1] = nb + '0';
-    } else {
-        str[1] = nb - 10 + 'A';
-    }
+    str[0] = hex_digits[(n >> 4) & 0x0F];
+    str[1] = hex_digits[n & 0x0F];
     str[2] = '\0';
 }
 
@@ -68,14 +81,14 @@ void intToDec(char* str, uint32_t n) { // Trims zeroes
     str[j] = '\0';
 }
 
-uint32_t read_le32(const uint8_t *data, uint16_t offset) {
+uint32_t read_le32(const uint8_t *data, const uint16_t offset) {
     return data[offset]         |
            (data[offset + 1] << 8)  |
            (data[offset + 2] << 16) |
            (data[offset + 3] << 24);
 }
 
-uint16_t read_le16(const uint8_t *data, uint16_t offset) {
+uint16_t read_le16(const uint8_t *data, const uint16_t offset) {
     return data[offset]         |
            (data[offset + 1] << 8);
 }

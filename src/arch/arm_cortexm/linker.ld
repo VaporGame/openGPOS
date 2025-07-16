@@ -11,16 +11,22 @@ SECTIONS
     .boot2 :
     {
         _sboot2 = .;
-        *(.boot2*)
+        KEEP(*(.boot2*))
         _eboot2 = .;
         . = . + (252 - (_eboot2 - _sboot2));
-        *(.crc*)
+        KEEP(*(.crc*))
     } > flash
     
     .text :
     {
-        *(.vector*)
-        *(.text*)
+        KEEP(*(.vector*))
+        KEEP(*(.text*))
+    } > flash
+    
+    .rodata :
+    {
+        *(.rodata*)
+        *(.srodata*)
     } > flash
 
     .data :
@@ -48,4 +54,12 @@ SECTIONS
 
     __heap_start__ = __bss_end__;
     __heap_end__ = __heap_start__ + 0x8000;
+
+    /DISCARD/ :
+    {
+        *(.comment)
+        *(.ARM.attributes)
+        *(.debug*)
+        *(.note.GNU-stack)
+    }
 }

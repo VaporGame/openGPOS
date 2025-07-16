@@ -1,7 +1,8 @@
 #include <dma/dma.h>
 #include <hardware_structs/dma_channels.h>
+#include <libc/unistd.h>
 
-extern void usSleep(uint64_t us);
+// extern void usSleep(uint64_t us);
 
 dma_channel_config_t dma_get_default_config(uint8_t channel) {
     return  DMA_CTRL_DATA_SIZE_1BYTE |
@@ -72,5 +73,5 @@ void dma_transfer_start(const void *src, void *dst, size_t n, uint8_t channel) {
 
 void dma_transfer_await(uint8_t channel) {
     // use alias 1 just to be safe
-    while(dma_channel_busy(channel)) {usSleep(1000);}
+    while(dma_channel_busy(channel)) {usleep(1000);}
 }

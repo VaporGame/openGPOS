@@ -1,15 +1,22 @@
-ENTRY(main)
+ENTRY(_start)
 
 MEMORY
 {
-    APP_SRAM (rxw) : ORIGIN = 0x20008000, LENGTH = 0x39000 /* 232KB, leaving 32KB for the kernel (SHRINK LATER) */
+    APP_SRAM (rxw) : ORIGIN = 0x20008000, LENGTH = 0x4000 /* 16KB, leaving 32KB for the kernel (SHRINK LATER) */
 }
 
 SECTIONS
-{
+{   
+    . = ORIGIN(APP_SRAM);
     .text :
     {
         *(.text*)
+    } > APP_SRAM
+    
+    .rodata :
+    {
+        *(.rodata*)
+        *(.srodata*)
     } > APP_SRAM
 
     .data :
@@ -27,7 +34,26 @@ SECTIONS
         __bss_end__ = .;
     } > APP_SRAM
 
-    _end = .;
+    .heap :
+    {
+        __heap_start__ = .;
+    } > APP_SRAM
 
-    __stack = ORIGIN(APP_SRAM) + LENGTH(APP_SRAM);
+    .stack (NOLOAD):
+    {
+        . = ORIGIN(APP_SRAM) + LENGTH(APP_SRAM) - 8K;
+        _stack_bottom = .;
+        . += 8K;
+        _stack_top = .;
+    } > APP_SRAM
+
+    __heap_end__ = _stack_bottom - 1;
+    
+    /DISCARD/ :
+    {
+        *(.comment)
+        *(.ARM.attributes)
+        *(.debug*)
+        *(.note.GNU-stack)
+    }
 }

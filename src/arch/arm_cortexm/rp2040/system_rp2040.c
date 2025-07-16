@@ -40,15 +40,15 @@ void SystemInit()
     while (!(resets_hw->RESET_DONE & (1 << 21))); // Wait for TIMER peripheral to respond
 }
 
-uint64_t readTime()
-{
-    uint32_t timeLR = timer_hw->LR;
-    uint32_t timeHR = timer_hw->HR;
-    return (((uint64_t)timeHR << 32) | timeLR);
-}
+// uint64_t readTime()
+// {
+//     uint32_t timeLR = timer_hw->LR;
+//     uint32_t timeHR = timer_hw->HR;
+//     return (((uint64_t)timeHR << 32) | timeLR);
+// }
 
-void usSleep(uint64_t us)
-{
-    uint64_t timeOld = readTime(); // Get current timer value
-    while ((readTime() - timeOld) < us); // Wait till desired time is passed
-}
+// void usSleep(uint64_t us)
+// {
+//     uint64_t timeOld = readTime(); // Get current timer value
+//     while ((readTime() - timeOld) < us); // Wait till desired time is passed
+// }

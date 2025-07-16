@@ -136,21 +136,21 @@ void free(void *ptr) {
         mergeNextMemorySpace(prev_memory_space);
 }
 
-void dumpHeap() {
-    // puts("[");
-    uartTx('[');
-    memory_space_t *curr = head;
+// void dumpHeap() {
+//     // puts("[");
+//     uartTx('[');
+//     memory_space_t *curr = head;
 
-    //printf("\tstart: %p, size: %ld, isalloc: %d\n", curr, curr->size, curr->isAllocated);
-    uartTxStr("start: "); uartTxHex((uint32_t)curr); uartTxStr(",size: "); uartTxDec(curr->size); uartTxStr(",lloc"); uartTxDec(curr->isAllocated); uartTxStr("\r\n");
-    uartRx();
+//     //printf("\tstart: %p, size: %ld, isalloc: %d\n", curr, curr->size, curr->isAllocated);
+//     uartTxStr("start: "); uartTxHex((uint32_t)curr); uartTxStr(",size: "); uartTxDec(curr->size); uartTxStr(",lloc"); uartTxDec(curr->isAllocated); uartTxStr("\r\n");
+//     uartRx();
 
-    while(curr->next) {
-        curr = curr->next;
-        //printf("\tstart: %p, size: %ld, isalloc: %d\n", curr, curr->size, curr->isAllocated);
-        uartTxStr("start: "); uartTxHex((uint32_t)curr); uartTxStr(",size: "); uartTxDec(curr->size); uartTxStr(",lloc"); uartTxDec(curr->isAllocated); uartTxStr("\r\n");
-        uartRx();
-    }
-    // puts("]");
-    uartTx(']');
-}
+//     while(curr->next) {
+//         curr = curr->next;
+//         //printf("\tstart: %p, size: %ld, isalloc: %d\n", curr, curr->size, curr->isAllocated);
+//         uartTxStr("start: "); uartTxHex((uint32_t)curr); uartTxStr(",size: "); uartTxDec(curr->size); uartTxStr(",lloc"); uartTxDec(curr->isAllocated); uartTxStr("\r\n");
+//         uartRx();
+//     }
+//     // puts("]");
+//     uartTx(']');
+// }

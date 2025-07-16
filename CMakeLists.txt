@@ -26,7 +26,7 @@ set(CMAKE_OBJDUMP "${TOOLCHAIN}objdump")
 
 set(UTILS ${CMAKE_SOURCE_DIR}/utils)
 
-set(CMAKE_C_FLAGS "-mcpu=cortex-m0plus -O3 --specs=nano.specs -ffreestanding -nostdlib")
+set(CMAKE_C_FLAGS "-mcpu=cortex-m0plus -O3 --specs=nano.specs -ffreestanding -nostdlib -ffunction-sections -fdata-sections")
 
 set(SOURCES
     ${SRCDIR}/kernel/main.c
@@ -58,7 +58,7 @@ include_directories(
 
 # Compile bootStage2 with linking
 add_executable(${BOOT2}.elf ${BOOT2DIR}/${BOOT2}.c)
-target_link_options(${BOOT2}.elf PRIVATE -T ${LNKSCRIPT})
+target_link_options(${BOOT2}.elf PRIVATE -T ${LNKSCRIPT} -Wl,--gc-sections)
 set_target_properties(${BOOT2}.elf PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${BUILDBOOT2DIR}/"
 )
@@ -80,7 +80,7 @@ add_custom_command(
 
 # Compile the project and link everything into an elf file
 add_executable(${PROJECT_NAME}.elf ${SOURCES} ${BOOT2DIR}/${BOOT2}.c ${BUILDBOOT2DIR}/${CRCVALUE}.c)
-target_link_options(${PROJECT_NAME}.elf PRIVATE -T ${LNKSCRIPT})
+target_link_options(${PROJECT_NAME}.elf PRIVATE -T ${LNKSCRIPT} -Wl,--gc-sections,-Map=${CMAKE_BINARY_DIR}/map.map)
 target_link_libraries(${PROJECT_NAME}.elf PUBLIC gcc)
 
 # Convert elf to bin to uf2 file
