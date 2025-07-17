@@ -2,9 +2,8 @@
 #include "hardware_structs/uart.h"
 #include "hardware_structs/io_bank0.h"
 #include "hardware_structs/clocks.h"
-#include <stdint.h>
 #include "util/hexutils.h"
-#include <stddef.h>
+
 
 void uartTx(unsigned const char x) {
     while ((uart_hw->FR & (1 << 5)) != 0);

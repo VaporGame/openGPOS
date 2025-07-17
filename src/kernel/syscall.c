@@ -5,22 +5,21 @@
 
 #include "uart/uart.h"
 static size_t sys_write(int fd, const void *buf, size_t count) {
-    for(size_t i = 0; i < count; i++) {
-        uartTx(*((const char *)buf));
-        buf++;
-    }
+    uart_puts((const char *)buf, count);
     return count;
 }
+
+// static int sys_execv(const char *file, char *const argv[]) {
+
+// }
 
 int do_syscall(uint32_t *regs, uint32_t syscall_num) {
     int ret_val = -1;
 
     switch (syscall_num) {
         case SYS_WRITE:
-        // uartTxStr("got sys write\r\n");
         // Args: fd R0, buf R1, count R2
             ret_val = sys_write((int)regs[0], (const void *)regs[1], (size_t)regs[2]);
-            // uartTxStr("returned from syscalli\r\n");
             break;
         default:
             uartTxStr("Unknown syscall number: ");

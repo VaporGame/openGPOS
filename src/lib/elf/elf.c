@@ -14,46 +14,30 @@ typedef struct {
     uint32_t p_type;
     uint32_t p_offset;
     uint32_t p_vaddr; // This is actually our physical address
-    uint32_t p_addr;
+    //uint32_t p_addr;
     uint32_t p_filesz;
     uint32_t p_memsz;
-    uint32_t p_flags;
-    uint32_t p_align;
+    //uint32_t p_flags;
+    //uint32_t p_align;
 } elf_data_t;
 
 uint32_t loadELF(const char *path) {
     uint32_t file_id = fat32_open(path, 0);
     uint32_t size = fat32_get_size(file_id);
     uint8_t *data = malloc(sizeof(uint8_t) * size);
-    if (data == NULL) {
-        return 6;
-    }
+    if (data == NULL) return 2;
+
     fat32_read(file_id, data, size);
     if (data[0x00] != 0x7F || data[1] != 0x45 || data[2] != 0x4C || data[3] != 0x46) {
-        return 1; // Not a elf executable
-    }
-
-    if (data[0x04] == 2) { //EI_CLASS
-        return 2; // 64 bit executable
-    }
-
-    if (data[0x05] == 2) { //EI_DATA
-        return 3; // Only support little endian
-    }
-
-    // validate elf version (not strictly needed)
-
-    // I do not understand the EI_OSABI field
-    // arm-none-eabi-gcc spits out a elf with 0x00
-    // which is the ABI for System V
-
-    // Check if the ELF is of executable type
-    if (data[0x10] != 0x02) {
-        return 4;
-    }
-
-    if (data[0x12] != 0x28) {
-        return 5; // not arm
+        return ELF_INVALID_EXECUTABLE; // Not a elf executable
+    } else if (data[0x04] == 2) { //EI_CLASS
+        return ELF_INVALID_EXECUTABLE; // 64 bit executable
+    } else if (data[0x05] == 2) { //EI_DATA
+        return ELF_INVALID_EXECUTABLE; // Only support little endian
+    } else if (data[0x10] != 0x02) { // Check if the ELF is of executable type
+        return ELF_INVALID_EXECUTABLE;
+    } else if (data[0x12] != 0x28) {
+        return ELF_INVALID_EXECUTABLE; // not arm
     }
 
     uint32_t e_entry = read_le32(data, 0x18);
@@ -82,15 +66,15 @@ uint32_t loadELF(const char *path) {
         // Since the EI_OSABI is set to System V, i think i can assume
         // that p_vaddr will be in ascending order
 
-        void* destination_addr = (void*)p_vaddr;
+        // void* destination_addr = ;
         
 
         // Copy into memory
-        memcpy(destination_addr, (const void*)data + p_offset, p_filesz);
+        memcpy((void*)p_vaddr, (const void*)data + p_offset, p_filesz);
 
         // Zero initialize the BSS
         if (p_memsz > p_filesz) {
-            memset((void*)((uintptr_t)destination_addr + p_filesz), 0, p_memsz - p_filesz);
+            memset((void*)((uintptr_t)(void*)p_vaddr + p_filesz), 0, p_memsz - p_filesz);
         } 
     }
     free(data);

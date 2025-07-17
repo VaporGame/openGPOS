@@ -15,9 +15,6 @@ typedef void (*vectFunc) (void);
 // extern uint32_t __stack, _sdata, _edata, _sdataf, _ebss, _sbss;
 extern uint32_t __stack, __data_start__, __data_end__, _sdataf, __bss_end__, __bss_start__;
 
-// Declare _start function from libgloss
-// extern void _start(void);
-
 // Declare interrupt functions defined in this file
 __attribute__((noreturn)) void defaultHandler();
 __attribute__((noreturn)) void resetHandler();
