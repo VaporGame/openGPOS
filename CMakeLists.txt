@@ -30,6 +30,7 @@ set(CMAKE_C_FLAGS "-mcpu=cortex-m0plus -O3 --specs=nano.specs -ffreestanding -no
 
 set(SOURCES
     ${SRCDIR}/kernel/main.c
+    ${SRCDIR}/kernel/syscall.c
     ${RP2040DIR}/system_rp2040.c
     ${RP2040DIR}/startup_rp2040.c
 )
@@ -40,7 +41,7 @@ file(GLOB_RECURSE LIB
 # list(APPEND SOURCES ${LIB})
 
 add_library(lib STATIC ${LIB})
-target_include_directories(lib PUBLIC ${CMAKE_SOURCE_DIR}/lib)
+target_include_directories(lib PUBLIC ${SRCDIR}/lib)
 
 file(GLOB_RECURSE LIB_C
     "${CMAKE_SOURCE_DIR}/libc/src/*.c"
@@ -60,6 +61,7 @@ include_directories(
     ${SRCDIR}/driver
     ${SRCDIR}/arch/arm_cortexm/rp2040/
     ${CMAKE_SOURCE_DIR}/libc/include
+    ${SRCDIR}/kernel
 )
 
 # Compile bootStage2 with linking

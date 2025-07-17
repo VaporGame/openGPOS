@@ -6,9 +6,16 @@
 #include "util/hexutils.h"
 #include <stddef.h>
 
-void uartTx( unsigned char x) {
+void uartTx(unsigned const char x) {
     while ((uart_hw->FR & (1 << 5)) != 0);
     uart_hw->DR = x;
+}
+
+void uart_puts(const char *str, size_t len) {
+    for (size_t i = 0; i < len; i++) {
+        uartTx(*str);
+        str++;
+    }
 }
 
 void uartTxStr(unsigned const char *x) {

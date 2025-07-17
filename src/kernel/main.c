@@ -14,10 +14,7 @@
 #include "elf/elf.h"
 #include <libc/unistd.h>
 
-// typedef void (*EntryFunction_t)(void);
-
-// Declare usSleep function
-// extern void usSleep(uint64_t us);
+typedef void (*EntryFunction_t)(void);
 
 // static void blink_forever(void) {
 //     io_bank0_hw->gpio[25].CTRL = 5;
@@ -50,10 +47,10 @@ static void resetSubsys(void) {
 static void kernel_main(void) {
     resetSubsys();
     uart_init(115200);
-    for(uint8_t i = 0; i < 255; i++) {
-        uartTxStr("\r\n");
+    for(uint8_t i = 0; i < 80; i++) {
+        uartTx('\n');
     }
-    uartTxStr("freeGPOS starting\r\n");
+    uartTxStr("\rfreeGPOS starting\r\n");
     // uartTxStr("initializing SPI\r\n");
     spi_init();
 
@@ -64,10 +61,12 @@ static void kernel_main(void) {
     init_malloc();
     fat32_init();
 
-    // uint32_t entry = loadELF("/testProg.elf");
-    // EntryFunction_t start = (EntryFunction_t)(uintptr_t)entry;
+    uint32_t entry = loadELF("/bin/init.elf");
+    EntryFunction_t start = (EntryFunction_t)(uintptr_t)entry;
 
-    // start();
+    start();
+    //const char *buf = "Hello from userland!";
+    //write(1, buf, 20);
     // while(1);
     
     // uint32_t file_id = fat32_open("/dir1/dir2/file.txt", 0);

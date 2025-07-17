@@ -6,6 +6,7 @@
 
 #include <libc/string.h>
 #include <libc/unistd.h>
+#include "syscall.h"
 
 // Type of vector table entry
 typedef void (*vectFunc) (void);
@@ -15,7 +16,7 @@ typedef void (*vectFunc) (void);
 extern uint32_t __stack, __data_start__, __data_end__, _sdataf, __bss_end__, __bss_start__;
 
 // Declare _start function from libgloss
-extern void _start(void);
+// extern void _start(void);
 
 // Declare interrupt functions defined in this file
 __attribute__((noreturn)) void defaultHandler();
@@ -24,7 +25,7 @@ __attribute__((noreturn)) void resetHandler();
 // Declare all other core interrupt functions as weak and alias of the defaultHandler
 void nmiHandler         () __attribute__((weak, alias("defaultHandler")));
 void hardFaultHandler   () __attribute__((weak, alias("defaultHandler")));
-void svCallHandler      () __attribute__((weak, alias("defaultHandler")));
+//void svCallHandler      () __attribute__((weak, alias("defaultHandler")));
 void pendSvHandler      () __attribute__((weak, alias("defaultHandler")));
 void sysTickHandler     () __attribute__((weak, alias("defaultHandler")));
 
@@ -129,7 +130,6 @@ void resetHandler()
     // Initialize the system (clock setup, watchdog)
     SystemInit();
 
-    //_start(); // Call C Runtime Startup, it will jump to main function
     main();
     while(true); // Inf loop if we ever come back here
 }
