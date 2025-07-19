@@ -84,7 +84,8 @@ target_link_libraries(${PROJECT_NAME}.elf PUBLIC gcc libc lib)
 
 # Automatically flash to pico
 add_custom_target(flash ALL
+    COMMAND ${CMAKE_OBJCOPY} -O binary ${BUILDDIR}/${PROJECT_NAME}.elf ${BUILDDIR}/${PROJECT_NAME}.bin
     COMMAND picotool load -o 0x10000000 ${BUILDDIR}/${PROJECT_NAME}.bin
     COMMAND picotool reboot
-    DEPENDS ${BUILDDIR}/${PROJECT_NAME}.uf2
+    DEPENDS ${BUILDDIR}/${PROJECT_NAME}.elf
 )
