@@ -23,6 +23,7 @@ set(CMAKE_C_COMPILER "${TOOLCHAIN}gcc")
 set(CMAKE_ASM_COMPILER "${TOOLCHAIN}gcc")
 set(CMAKE_OBJCOPY "${TOOLCHAIN}objcopy")
 set(CMAKE_OBJDUMP "${TOOLCHAIN}objdump")
+set(CMAKE_SIZE "${TOOLCHAIN}size")
 
 set(UTILS ${CMAKE_SOURCE_DIR}/utils)
 
@@ -53,11 +54,11 @@ file(GLOB_RECURSE DRIVER
 list(APPEND SOURCES ${DRIVER})
 
 include_directories(
+    ${CMAKE_SOURCE_DIR}/libc/include
     ${SRCDIR}/lib
     ${SRCDIR}/driver
-    ${SRCDIR}/arch/arm_cortexm/rp2040/
-    ${CMAKE_SOURCE_DIR}/libc/include
     ${SRCDIR}/kernel
+    ${SRCDIR}/arch/arm_cortexm/rp2040/ # For hardware_structs
 )
 
 # Compile bootStage2 with linking
@@ -71,7 +72,7 @@ set_target_properties(${BOOT2}.elf PROPERTIES
 add_custom_command(
     OUTPUT ${BUILDBOOT2DIR}/${CRCVALUE}.c
     COMMAND ${CMAKE_OBJCOPY} -O binary ${BUILDBOOT2DIR}/${BOOT2}.elf ${BUILDBOOT2DIR}/${BOOT2}.bin
-    COMMAND gcc ${RP2040DIR}/boot2/${COMPCRC}.c -o ${BUILDBOOT2DIR}/${COMPCRC}.out # This is not good, but i need the host toolchain and dont wanna make a whole subproject for one file 
+    COMMAND gcc ${BOOT2DIR}/${COMPCRC}.c -o ${BUILDBOOT2DIR}/${COMPCRC}.out # This is not good, but i need the host toolchain and dont wanna make a whole subproject for one file 
     COMMAND ${BUILDBOOT2DIR}/${COMPCRC}.out ${BUILDBOOT2DIR}/${BOOT2}.bin
     DEPENDS ${BUILDBOOT2DIR}/${BOOT2}.elf
     DEPENDS ${RP2040DIR}/boot2/${COMPCRC}.c
@@ -84,6 +85,7 @@ target_link_libraries(${PROJECT_NAME}.elf PUBLIC gcc libc lib)
 
 # Automatically flash to pico
 add_custom_target(flash ALL
+    COMMAND ${CMAKE_SIZE} ${BUILDDIR}/${PROJECT_NAME}.elf
     COMMAND ${CMAKE_OBJCOPY} -O binary ${BUILDDIR}/${PROJECT_NAME}.elf ${BUILDDIR}/${PROJECT_NAME}.bin
     COMMAND picotool load -o 0x10000000 ${BUILDDIR}/${PROJECT_NAME}.bin
     COMMAND picotool reboot
