@@ -82,16 +82,9 @@ add_executable(${PROJECT_NAME}.elf ${SOURCES} ${BOOT2DIR}/${BOOT2}.c ${BUILDBOOT
 target_link_options(${PROJECT_NAME}.elf PRIVATE -T ${LNKSCRIPT} -Wl,--gc-sections,-Map=${CMAKE_BINARY_DIR}/map.map)
 target_link_libraries(${PROJECT_NAME}.elf PUBLIC gcc libc lib)
 
-# Convert elf to bin to uf2 file
-add_custom_target(${PROJECT_NAME}.uf2 ALL
-    COMMAND ${CMAKE_OBJCOPY} -O binary ${BUILDDIR}/${PROJECT_NAME}.elf ${BUILDDIR}/${PROJECT_NAME}.bin
-    COMMAND python3 ${UTILS}/uf2/utils/uf2conv.py -b 0x10000000 -f 0xe48bff56 -c ${BUILDDIR}/${PROJECT_NAME}.bin -o ${BUILDDIR}/${PROJECT_NAME}.uf2
-    DEPENDS ${PROJECT_NAME}.elf
-)
-
 # Automatically flash to pico
 add_custom_target(flash ALL
-    COMMAND picotool load ${BUILDDIR}/${PROJECT_NAME}.uf2
+    COMMAND picotool load -o 0x10000000 ${BUILDDIR}/${PROJECT_NAME}.bin
     COMMAND picotool reboot
     DEPENDS ${BUILDDIR}/${PROJECT_NAME}.uf2
 )
