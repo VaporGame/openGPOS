@@ -38,16 +38,12 @@ set(SOURCES
 file(GLOB_RECURSE LIB
     "${SRCDIR}/lib/*.c"
 )
-# list(APPEND SOURCES ${LIB})
-
 add_library(lib STATIC ${LIB})
 target_include_directories(lib PUBLIC ${SRCDIR}/lib)
 
 file(GLOB_RECURSE LIB_C
     "${CMAKE_SOURCE_DIR}/libc/src/*.c"
 )
-#list(APPEND SOURCES ${LIB_C})
-
 add_library(libc STATIC ${LIB_C})
 target_include_directories(libc PUBLIC ${CMAKE_SOURCE_DIR}/libc/include)
 
@@ -71,19 +67,14 @@ set_target_properties(${BOOT2}.elf PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${BUILDBOOT2DIR}/"
 )
 
-# First, compile compCrc32.cpp to create the executable
-add_executable(compCrc32.out ${BOOT2DIR}/compCrc32.cpp)
-target_compile_options(compCrc32.out PUBLIC -I ${UTILS})
-set_target_properties(compCrc32.out PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY "${BUILDBOOT2DIR}/"
-)
-
-# Compute CRC32 value and generate a c code for it
+# compile compCrc32.c and Compute CRC32 value and generate c code for it
 add_custom_command(
     OUTPUT ${BUILDBOOT2DIR}/${CRCVALUE}.c
     COMMAND ${CMAKE_OBJCOPY} -O binary ${BUILDBOOT2DIR}/${BOOT2}.elf ${BUILDBOOT2DIR}/${BOOT2}.bin
+    COMMAND gcc ${RP2040DIR}/boot2/${COMPCRC}.c -o ${BUILDBOOT2DIR}/${COMPCRC}.out # This is not good, but i need the host toolchain and dont wanna make a whole subproject for one file 
     COMMAND ${BUILDBOOT2DIR}/${COMPCRC}.out ${BUILDBOOT2DIR}/${BOOT2}.bin
     DEPENDS ${BUILDBOOT2DIR}/${BOOT2}.elf
+    DEPENDS ${RP2040DIR}/boot2/${COMPCRC}.c
 )
 
 # Compile the project and link everything into an elf file

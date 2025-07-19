@@ -51,6 +51,8 @@ int create_process(uint8_t pid, unsigned int burst_time) {
     return process_table[idx].pid;
 }
 
+// void context_switch
+
 // void schedule() {
 //     int8_t next_pid = -1;
 //     bool found_ready = false;

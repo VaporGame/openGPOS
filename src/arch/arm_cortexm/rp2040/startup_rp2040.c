@@ -57,9 +57,6 @@ void rtcIrq             () __attribute__((weak, alias("defaultHandler")));
 // Declare SystemInit function
 extern void SystemInit(void);
 
-// Declare usSleep function
-//extern void usSleep(uint64_t us);
-
 // Declare main function
 extern int main(void);
 

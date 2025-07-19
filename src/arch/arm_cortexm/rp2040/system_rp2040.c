@@ -1,6 +1,14 @@
 #include <stdint.h>
 #include "hardware_structs/clocks.h"
 #include "hardware_structs/resets.h"
+#include "hardware_structs/m0plus.h"
+
+#define SYSTICK_RELOAD_VAL ((CLK_SYS_HZ / (1000 / 10)) - 1)
+
+#define PRIORITY_0_HIGHEST  0x00UL // Mapped to 0x00 in the 8-bit field
+#define PRIORITY_1          0x40UL // Mapped to 0x40 in the 8-bit field
+#define PRIORITY_2          0x80UL // Mapped to 0x80 in the 8-bit field
+#define PRIORITY_3_LOWEST   0xC0UL // Mapped to 0xC0 in the 8-bit field
 
 void SystemInit()
 {
@@ -34,21 +42,22 @@ void SystemInit()
     // Shut down ROSC
     rosc_hw->CTRL = (rosc_hw->CTRL & (~0x00fff000)) | (0xd1e << 12);
 
-    // // Enable 64-bit Timer
+    // Enable 64-bit Timer
     watchdog_hw->TICK |= (12 << 0); // Set appropriate value for TICK, 1 us = 12 cycles / 12MHz
     resets_hw->RESET &= ~(1 << 21); // Bring 64-bit Timer out of reset state
     while (!(resets_hw->RESET_DONE & (1 << 21))); // Wait for TIMER peripheral to respond
+
+    // Set up NVIC
+    // SVC
+    scb_hw->SHPR2 = (scb_hw->SHPR2 & ~(0xFF << 0)) | (PRIORITY_0_HIGHEST << 0);
+    // SysTick
+    scb_hw->SHPR3 = (scb_hw->SHPR3 & ~(0xFF << 24)) | (PRIORITY_2 << 24);
+    // PendSV
+    scb_hw->SHPR3 = (scb_hw->SHPR3 & ~(0xFF << 16)) | (PRIORITY_3_LOWEST << 16);
+
+    // Set up SysTick
+    syst_hw->RVR = SYSTICK_RELOAD_VAL; // 10ms ticks
+    syst_hw->CVR = 0;
+    syst_hw->CSR |= (1 << 2) | (1 << 1) | (1 << 0); 
+    // IMPORTANT: Enable global interrupts when ready to start processing interrupts.
 }
-
-// uint64_t readTime()
-// {
-//     uint32_t timeLR = timer_hw->LR;
-//     uint32_t timeHR = timer_hw->HR;
-//     return (((uint64_t)timeHR << 32) | timeLR);
-// }
-
-// void usSleep(uint64_t us)
-// {
-//     uint64_t timeOld = readTime(); // Get current timer value
-//     while ((readTime() - timeOld) < us); // Wait till desired time is passed
-// }
