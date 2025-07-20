@@ -17,6 +17,7 @@ typedef enum {
     FAT_ERROR_END_OF_CHAIN,
     FAT_ERROR_NOT_INITIALIZED,
     FAT_ERROR_NO_MORE_ENTRIES, // New error for readdir
+    FAT_ERROR_FILE_NOT_FOUND,
 } fat_error_t;
 
 typedef struct {
@@ -27,9 +28,6 @@ typedef struct {
     bool      sector_buffer_valid;  // True if buffer contains valid data
 
     // For LFN reconstruction
-    char      lfn_buffer[MAX_LFN_PARTS][MAX_UTF8_CHARS_PER_LFN_PART]; // Buffer to build LFN
-    char      assembled_lfn_buffer[MAX_FILENAME_LEN];
-    uint8_t   lfn_parts_found; // Expected number of LFN entries
     uint8_t   lfn_checksum;         // Checksum of the SFN to match LFNs
 } fat_directory_iterator_t;
 

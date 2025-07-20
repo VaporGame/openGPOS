@@ -7,8 +7,6 @@
 #include "util/hexutils.h"
 #include <libc/unistd.h>
 
-// extern void usSleep(uint64_t us);
-
 static void deassertCS() {
     sio_hw->OUT_SET |= 1 << 9; // Deassert CS
     spi_send_byte(0xFF); // Dummy clock
@@ -45,7 +43,7 @@ static void read_bytes(uint8_t *buffer, uint8_t count) {
     }
 }
 
-static bool read_data_block(uint8_t *buffer, uint16_t count, uint16_t timeout_val) {
+static bool read_data_block(uint8_t *buffer, const uint16_t timeout_val) {
     uint16_t timeout = timeout_val;
     uint8_t token = 0xFF;
 
@@ -57,16 +55,15 @@ static bool read_data_block(uint8_t *buffer, uint16_t count, uint16_t timeout_va
     } while (token == 0xFF && timeout > 0);
 
     if (timeout == 0) {
-        // uartTxStr("Data block read timeout (no start token)\r\n");
         return false;
     }
     if (token != 0xFE) {
-        // uartTxStr("Unexpected data start token\r\n");
         return false;
     }
 
-    for (uint16_t i = 0; i < count; i++) {
-        buffer[i] = spi_read_byte();
+    for (uint16_t i = 0; i < SD_BLOCK_SIZE; i++) {
+        *buffer = spi_read_byte();
+        buffer++;
         spi_send_byte(0xFF);
     }
 
@@ -74,14 +71,13 @@ static bool read_data_block(uint8_t *buffer, uint16_t count, uint16_t timeout_va
     spi_send_byte(0xFF);
     uint8_t crc_high = spi_read_byte();
     spi_send_byte(0xFF);
-
+    
     // CRC validation can be put here if needed
 
     return true;
 } 
 
 bool SDInit(void) {
-    // uartTxStr("initializing SD card ");
     usleep(10000); //10ms, let sd card stabilize
 
     sio_hw->OUT_SET |= 1 << 9;
@@ -94,7 +90,6 @@ bool SDInit(void) {
     
     if (cmd0_r1 != 0x01) {
         deassertCS();
-        // uartTxStr("[FAIL]\r\n");
         return false;
     }
 
@@ -111,10 +106,7 @@ bool SDInit(void) {
         deassertCS();
 
         if(r7_data[2] == 0x01 && r7_data[3] == 0xAA) {
-            //uartTxStr("CMD8 OK\r\n");
         } else {
-            // uartTxStr("CMD8 R1 OK, but incorrect data pattern. Card unusable\r\n");
-            //deassertCS();
             return false;
         }
 
@@ -123,7 +115,6 @@ bool SDInit(void) {
         deassertCS();
         return false;
     } else {
-        // uartTxStr("CMD8 Unexpected R1 response\r\n");
         deassertCS();
         return false;
     }
@@ -141,8 +132,6 @@ bool SDInit(void) {
         deassertCS();
 
         if (cmd55_r1 != 0x01) {
-            // uartTxStr("CMD55 unexpected R1 response\r\n");
-            // uartTxStr("Aborting ACMD41 loop\r\n");
             return false;
         }
 
@@ -152,7 +141,6 @@ bool SDInit(void) {
         deassertCS();
 
         if (acmd41_r1 == 0x00) {
-            //uartTxStr("ACMD41 OK: Card is ready\r\n");
             break;
         }
 
@@ -161,7 +149,6 @@ bool SDInit(void) {
     } while (acmd41_timeout > 0);
 
     if (acmd41_timeout == 0) {
-        // uartTxStr("ACMD41 FAIL (timeout)\r\n");
         return false;
     }
     
@@ -179,15 +166,11 @@ bool SDInit(void) {
             spi_send_byte(0xFF);
         }
         
-        if (ocr_data[0] & 0x40) {
-            //uartTxStr("CMD58 OK: Card is SDHC/SDXC\r\n");
-        } else {
-            // uartTxStr("CMD58 OK: Card is Standard Capacity, unsupported, this should never happen");
+        if (!(ocr_data[0] & 0x40)) {
             deassertCS();
             return false;
         }
     } else {
-        // uartTxStr("CMD58 FAIL");
         deassertCS();
         return false;
     }
@@ -232,27 +215,22 @@ bool SDInit(void) {
 // TODO: IMPLEMENT MULTI BLOCK READING SD COMMANDS
 
 bool sdReadBlock(uint32_t block_address, uint8_t *data_buffer) {
-    //uartTxStr("reading block");
-
     // CMD17 (READ_SINGLE_BLOCK)
     // for SDHC/SDXC, block address is already in 512 byte units
     SDSendCommand(0x51, block_address, 0x01); //dummy crc
 
     uint8_t cmd17_r1 = read_r1_response(0xFF);
     if (cmd17_r1 != 0x00) {
-        // uartTxStr("CMD17 FAIL\r\n");
         deassertCS();
         return false;
     }
 
-    if (!read_data_block(data_buffer, 512, 0xFFFF)) {
-        // uartTxStr("Failed to read data block\r\n");
+    if (!read_data_block(data_buffer, 0xFFFF)) {
         deassertCS();
         return false;
     }
 
     deassertCS();
-
     return true;
 }
 
@@ -263,7 +241,6 @@ static bool sdWaitForNotBusy(uint32_t timeout_ms) {
     while (spi_read_byte() == 0x00) { // SD card holds DO low (0x00) when busy
         timeout_counter++;
         if (timeout_counter > MAX_TIMEOUT_COUNT) {
-            // uartTxStr("SD card busy timeout!\r\n");
             return false; // Timeout occurred
         }
     }
@@ -271,15 +248,12 @@ static bool sdWaitForNotBusy(uint32_t timeout_ms) {
 }
 
 bool sdWriteBlock(uint32_t block_address, uint8_t *data_buffer) {
-    //uartTxStr("reading block");
-
     // CMD24 (READ_SINGLE_BLOCK)
     // for SDHC/SDXC, block address is already in 512 byte units
     SDSendCommand(0x58, block_address, 0x01); //dummy crc
 
     uint8_t cmd24_r1 = read_r1_response(0xFF);
     if (cmd24_r1 != 0x00) {
-        // uartTxStr("CMD24 FAIL\r\n");
         deassertCS();
         return false;
     }
@@ -287,7 +261,7 @@ bool sdWriteBlock(uint32_t block_address, uint8_t *data_buffer) {
     // Send start block token
     spi_send_byte(0xFE);
 
-    for (uint16_t i = 0; i < 512; i++) {
+    for (uint16_t i = 0; i < SD_BLOCK_SIZE; i++) {
         spi_send_byte(data_buffer[i]);
     }
 
@@ -302,7 +276,6 @@ bool sdWriteBlock(uint32_t block_address, uint8_t *data_buffer) {
     }
 
     if ((data_response & 0x1F) != 0x05) { // Check for data accepted (0b00000101)
-        // uartTxStr("Data write response error");
         deassertCS();
         return false;
     }
@@ -323,10 +296,69 @@ bool SDShutdown(void) {
     
     if (cmd0_r1 == 0x01) {
         deassertCS();
-        //uartTxStr("SD Card idle\r\n");
         return true;
     } else {
-        //uartTxStr("Failed to bring SD card into idle state\r\n");
         return false;
     }
+}
+
+static bool read_data_block_partial(uint16_t start_offset, uint8_t *buffer, uint16_t count, uint16_t timeout_val) {
+    uint16_t timeout = timeout_val;
+    uint8_t token = 0xFF;
+
+    //wait for data start token (0xFE)
+    do {
+        token = spi_read_byte();
+        spi_send_byte(0xFF);
+        timeout--;
+    } while (token == 0xFF && timeout > 0);
+
+    if (timeout == 0 || token != 0xFE) {
+        return false;
+    }
+
+    // Read and discard bytes until start_offset
+    for (uint16_t i = 0; i < start_offset; i++) {
+        spi_read_byte();
+        spi_send_byte(0xFF);
+    }
+
+    // Read requested bytes into buffer
+    for (uint16_t i = 0; i < count; i++) {
+        buffer[i] = spi_read_byte();
+        spi_send_byte(0xFF);
+    }
+
+    // Read and discard remaining bytes in the 512-byte block + CRC
+    // Total bytes to discard = 512 - start_offset - count + 2 (for CRC)
+    uint16_t bytes_to_discard = (SD_BLOCK_SIZE - start_offset - count) + 2; // +2 for CRC
+    for (uint16_t i = 0; i < bytes_to_discard; i++) {
+        spi_read_byte();
+        spi_send_byte(0xFF);
+    }
+    
+    // CRC validation can be put here if needed, if you read them into variables
+    // For this example, they are just discarded.
+
+    return true;
+}
+
+bool sdReadPartialBlock(uint32_t block_number, uint16_t offset, uint8_t* buffer, uint16_t length) {
+    // CMD17 (READ_SINGLE_BLOCK)
+    SDSendCommand(0x51, block_number, 0x01); //dummy crc
+
+    uint8_t cmd17_r1 = read_r1_response(0xFF);
+    if (cmd17_r1 != 0x00) {
+        deassertCS();
+        return false;
+    }
+
+    // Use the modified read_data_block_partial
+    if (!read_data_block_partial(offset, buffer, length, 0xFFFF)) {
+        deassertCS();
+        return false;
+    }
+
+    deassertCS();
+    return true;
 }

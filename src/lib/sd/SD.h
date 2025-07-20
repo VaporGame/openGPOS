@@ -13,4 +13,6 @@ bool sdWriteBlock(uint32_t block_address, uint8_t *data_buffer);
 
 bool SDShutdown(void);
 
+bool sdReadPartialBlock(uint32_t block_number, uint16_t offset, uint8_t* buffer, uint16_t length);
+
 #endif //SD_H

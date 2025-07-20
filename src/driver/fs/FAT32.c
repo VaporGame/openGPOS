@@ -10,9 +10,6 @@
 #define MAX_OPEN_FILES 16
 file_handle_t open_file_handles[MAX_OPEN_FILES];
 
-uint32_t fat32_volume_start_lba = 0;
-uint32_t fat32_volume_sector_count = 0;
-
 typedef struct {
     uint32_t volume_start_lba;
     uint16_t bytes_per_sector;
@@ -28,6 +25,7 @@ typedef struct {
     bool is_initialized;
     uint16_t fsinfo_sector_lba;
     uint16_t backup_boot_sector_lba;
+    uint32_t bytes_per_cluster;
 } fat32_volume_info_t;
 
 fat32_volume_info_t g_fat32_volume_info;
@@ -73,114 +71,90 @@ typedef union {
     uint8_t raw[32]; // For general byte access
 } fat_dir_entry_t;
 
-//fat_directory_iterator_t g_root_dir_iterator; // REMOVE
-
-static bool read_sectors(uint32_t lba, uint32_t count, uint8_t *buffer) {
+static inline bool read_sectors(uint32_t lba, uint32_t count, uint8_t *buffer) {
     for (uint32_t i = 0; i < count; i++) {
-        uint32_t current_lba = lba + i;
-        uint8_t *current_buffer_pos = buffer + (i * 512);
-
-        bool result = sdReadBlock(current_lba, current_buffer_pos);
-
-        if (result == false) {
+        if (!sdReadBlock(lba + i, buffer + (i * 512))) {
             return false;
         }
     }
     return true;
 }
 
-static bool write_sectors(uint32_t lba, uint32_t count, uint8_t *buffer) {
+static inline bool write_sectors(uint32_t lba, uint32_t count, uint8_t *buffer) {
     for (uint32_t i = 0; i < count; i++) {
-        uint32_t current_lba = lba + i;
-        uint8_t *current_buffer_pos = buffer + (i * 512);
-
-        bool result = sdWriteBlock(current_lba, current_buffer_pos);
-
-        if (!result) {
+        if (!sdWriteBlock(lba + i, buffer + (i * 512))) {
             return false;
         }
     }
     return true;
+}
+
+static inline int min(int a, int b) {
+    return (a < b) ? a : b;
 }
 
 // TODO: IMPLEMENT MULTI BLOCK READING SD COMMANDS
 
 static bool parseMBR(void) {
-    uint8_t block_data[512];
+    static uint8_t mbr_buffer[66];
 
-    if (!sdReadBlock(0, block_data)) {
-        // uartTxStr("Failed to read MBR block 0.\r\n");
+    if (!sdReadPartialBlock(0, 446, mbr_buffer, 66)) {
         return false;
     }
 
-    // Read MBR signature
-    //uint16_t mbr_signature = block_data[510] | (block_data[511] << 8);
-    uint16_t mbr_signature = read_le16(block_data, 510);
+    uint16_t mbr_signature = read_le16(mbr_buffer, 64); // Read from the start of the 2-byte buffer
     if (mbr_signature != 0xAA55) {
-        // uartTxStr("Card not formatted with MBR (bad signature)");
         return false;
     }
 
-    // Read the four partition table entries
-    // First partition entry is at offset 446 (0x1BE)
-    // Each entry is 16 bytes
+    // Process the partition table entries from the smaller buffer
     for (uint8_t i = 0; i < 4; i++) {
-        uint16_t offset = 0x1BE + (i * 16);
+        const uint16_t offset = i * 16;
 
-        // Read bootable flag (first byte)
-        bool bootable = (block_data[offset] & 0x80);
-        // MSB signifies if the partition is bootable
-
-        // Read partition type
-        // Should be 0x0B or 0x0C for FAT32
-        uint8_t type = block_data[offset + 4];
-        bool isFAT32 = false;
-        if(type == 0x0B || type == 0x0C) {
-            isFAT32 = true;
-        }
-
-        // Read LBA of first sector
-        // It is in little endian
-        uint32_t first_sector = read_le32(block_data, offset + 8);
-
-        // Read number of sectors
-        uint32_t sector_count = read_le32(block_data, offset + 12);
-        if(bootable && isFAT32) {
-            fat32_volume_sector_count = sector_count;
-            fat32_volume_start_lba = first_sector;
-            // uartTxStr("Found bootable partition: ");
-            // uartTxDec(i + 1);
-            // uartTxStr("\r\n");
+        if ((mbr_buffer[offset] & 0x80) && (mbr_buffer[offset + 4] == 0x0B || mbr_buffer[offset + 4] == 0x0C)) {
+            g_fat32_volume_info.total_sectors = read_le32(mbr_buffer, offset + 12);
+            g_fat32_volume_info.volume_start_lba = read_le32(mbr_buffer, offset + 8);
             return true;
         }
     }
-    // uartTxStr("No bootable FAT32 partition found\r\n");
     return false;
 }
 
 // This function will only be ran internally after parsing the MBR, its not static for testing
 static bool parseBPB(void) {
-    uint8_t bpb_data[512];
+    static uint8_t bpb_data[41];
 
-    if(!sdReadBlock(fat32_volume_start_lba, bpb_data)) {
-        // uartTxStr("failed to read BPB\r\n");
+    // if(!sdReadBlock(g_fat32_volume_info.volume_start_lba, bpb_data)) {
+    if (!sdReadPartialBlock(g_fat32_volume_info.volume_start_lba, 0x0B, bpb_data, 41)) {
         return false;
     }
 
-    g_fat32_volume_info.volume_start_lba = fat32_volume_start_lba;
-    g_fat32_volume_info.bytes_per_sector = read_le16(bpb_data, 0x0B);
-    g_fat32_volume_info.sectors_per_cluster = bpb_data[0x0D];
-    g_fat32_volume_info.reserved_sector_count = read_le16(bpb_data, 0x0E);
-    g_fat32_volume_info.num_fats = bpb_data[0x10];
-    g_fat32_volume_info.fat_size_sectors = read_le32(bpb_data, 0x24);
-    g_fat32_volume_info.root_dir_cluster = read_le32(bpb_data, 0x2c);
-    g_fat32_volume_info.total_sectors = read_le32(bpb_data, 0x20);
-    g_fat32_volume_info.fsinfo_sector_lba = read_le16(bpb_data, 0x30);
-    g_fat32_volume_info.backup_boot_sector_lba = read_le16(bpb_data, 0x32);
+    // 18 bytes
+    // g_fat32_volume_info.bytes_per_sector = read_le16(bpb_data, 0x0B);
+    // g_fat32_volume_info.sectors_per_cluster = bpb_data[0x0D];
+    // g_fat32_volume_info.reserved_sector_count = read_le16(bpb_data, 0x0E);
+    // g_fat32_volume_info.num_fats = bpb_data[0x10];
+    // g_fat32_volume_info.fat_size_sectors = read_le32(bpb_data, 0x24);
+    // g_fat32_volume_info.root_dir_cluster = read_le32(bpb_data, 0x2c);
+    // //g_fat32_volume_info.total_sectors = read_le32(bpb_data, 0x20);
+    // g_fat32_volume_info.fsinfo_sector_lba = read_le16(bpb_data, 0x30);
+    // g_fat32_volume_info.backup_boot_sector_lba = read_le16(bpb_data, 0x32);
+
+    g_fat32_volume_info.bytes_per_sector = read_le16(bpb_data, 0);
+    g_fat32_volume_info.sectors_per_cluster = bpb_data[0x02];
+    g_fat32_volume_info.reserved_sector_count = read_le16(bpb_data, 0x03);
+    g_fat32_volume_info.num_fats = bpb_data[0x05];
+    g_fat32_volume_info.fat_size_sectors = read_le32(bpb_data, 25);
+    g_fat32_volume_info.root_dir_cluster = read_le32(bpb_data, 33);
+    //g_fat32_volume_info.total_sectors = read_le32(bpb_data, 0x20);
+    g_fat32_volume_info.fsinfo_sector_lba = read_le16(bpb_data, 37);
+    g_fat32_volume_info.backup_boot_sector_lba = read_le16(bpb_data, 39);
 
     g_fat32_volume_info.first_fat_lba = g_fat32_volume_info.volume_start_lba + g_fat32_volume_info.reserved_sector_count;
     g_fat32_volume_info.data_start_lba =    g_fat32_volume_info.first_fat_lba +
                                             (g_fat32_volume_info.num_fats * g_fat32_volume_info.fat_size_sectors);
+
+    g_fat32_volume_info.bytes_per_cluster = g_fat32_volume_info.sectors_per_cluster * g_fat32_volume_info.bytes_per_sector;
 
     uint32_t data_sectors = g_fat32_volume_info.total_sectors - (g_fat32_volume_info.reserved_sector_count +
                                                                 (g_fat32_volume_info.num_fats * g_fat32_volume_info.fat_size_sectors));
@@ -207,37 +181,28 @@ bool fat32_init(void) {
 #define FAT32_BAD_CLUSTER      0x0FFFFFF7
 #define FAT32_LAST_CLUSTER_VALID 0x0FFFFFFF // EOC marker valid up to this value
 
-uint32_t getNextCluster(uint32_t current_cluster, uint32_t *next_cluster_out) {
+static uint32_t getNextCluster(uint32_t current_cluster, uint32_t *next_cluster_out) {
     if (!g_fat32_volume_info.is_initialized) {
-        // uartTxStr("Not inited\r\n");
         return FAT_ERROR_NOT_INITIALIZED;
     }
 
     if (current_cluster < 2 || current_cluster >= g_fat32_volume_info.total_clusters + 2) {
-        // uartTxStr("Error: Invalid current_cluster: ");
-        // uartTxHex(current_cluster);
-        // uartTxStr("\r\n");
         return FAT_ERROR_INVALID_CLUSTER;
     }
 
-    uint8_t bytes_per_entry = 4;
-    uint32_t fat_entry_offset = current_cluster * bytes_per_entry;
-    uint32_t fat_sector_offset = fat_entry_offset / g_fat32_volume_info.bytes_per_sector;
-    uint16_t fat_byte_in_sector_offset = fat_entry_offset % g_fat32_volume_info.bytes_per_sector;
-    uint32_t fat_sector_lba = g_fat32_volume_info.first_fat_lba + fat_sector_offset;
+    const uint32_t fat_entry_offset = current_cluster * 4;
+    const uint32_t fat_sector_offset = fat_entry_offset / g_fat32_volume_info.bytes_per_sector;
+    const uint16_t fat_byte_in_sector_offset = fat_entry_offset % g_fat32_volume_info.bytes_per_sector;
+    const uint32_t fat_sector_lba = g_fat32_volume_info.first_fat_lba + fat_sector_offset;
 
-    uint8_t fat_sector_buffer[g_fat32_volume_info.bytes_per_sector];
+    uint8_t fat_entry_buffer[4];
 
     // Read the FAT sector
-    bool result = sdReadBlock(fat_sector_lba, fat_sector_buffer);
-    if (result == false) {
-        // uartTxStr("Failed to read FAT sector at LBA ");
-        // uartTxHex(fat_sector_lba);
-        // uartTxStr("\r\n");
+    if (!sdReadPartialBlock(fat_sector_lba, fat_byte_in_sector_offset, fat_entry_buffer, 4)) {
         return FAT_ERROR_READ_FAIL;
     }
 
-    uint32_t fat_entry_value = read_le32(fat_sector_buffer, fat_byte_in_sector_offset);
+    uint32_t fat_entry_value = read_le32(fat_entry_buffer, 0);
 
     fat_entry_value &= 0x0FFFFFFF; // Clear bits 28-31
 
@@ -248,7 +213,6 @@ uint32_t getNextCluster(uint32_t current_cluster, uint32_t *next_cluster_out) {
         *next_cluster_out = 0;
         return FAT32_BAD_CLUSTER;
     } else if (fat_entry_value == 0) {
-        //uartTxStr("Cluster "); uartTxHex(current_cluster); uartTxStr(" points to a free cluster\r\n");
         *next_cluster_out = 0;
         return FAT_ERROR_INVALID_CLUSTER;
     } else {
@@ -266,12 +230,9 @@ static uint32_t fatClusterToLba(uint32_t cluster) {
 static uint8_t fat_read_cluster(uint32_t cluster, uint8_t *buffer) {
     uint32_t lba = fatClusterToLba(cluster);
     if (lba == 0) {
-        //uartTxStr("Attempted to read invalid cluster\r\n");
         return FAT_ERROR_INVALID_CLUSTER;
     }
-    uint32_t sectors_to_read = g_fat32_volume_info.sectors_per_cluster;
-    if (!read_sectors(lba, sectors_to_read, buffer)) {
-        //uartTxStr("Failed to read cluster\r\n");
+    if (!read_sectors(lba, g_fat32_volume_info.sectors_per_cluster, buffer)) {
         return FAT_ERROR_READ_FAIL;
     }
     return FAT_SUCCESS;
@@ -294,8 +255,8 @@ static void fat_sfn_to_string(const uint8_t *sfn_name, char *out_name) {
 
 static uint8_t fat_sfn_checksum(const uint8_t *sfn_name) {
     uint8_t sum = 0;
-    for (uint8_t i = 11; i > 0; i--) {
-        sum = ((sum & 1) ? 0x80 : 0) + (sum >> 1) + *sfn_name++;
+    for (uint8_t i = 0; i < 11; i++) {
+        sum = ((sum & 1) ? 0x80 : 0) + (sum >> 1) + sfn_name[i];
     }
     return sum;
 }
@@ -304,7 +265,6 @@ static size_t fat_lfn_to_utf8(const uint8_t *utf16_name_part, size_t copy_len, c
     uint16_t buffer[copy_len/2];
     memcpy(buffer, utf16_name_part, copy_len);
 
-    //size_t current_len = strlen(out_buffer);
     size_t original_out_len = current_out_len;
     for (unsigned int i = 0; i < copy_len / 2; i++) {
         uint16_t wc = buffer[i];
@@ -312,11 +272,14 @@ static size_t fat_lfn_to_utf8(const uint8_t *utf16_name_part, size_t copy_len, c
         if (wc == 0x0000 || wc == 0xFFFF) {
             break;
         }
-        if (wc < 0x80) {
-            out_buffer[current_out_len++] = (char)wc;
-        } else {
-            out_buffer[current_out_len++] = '?';
-        }
+        
+        if (current_out_len < max_len - 1) {
+            if (wc < 0x80) {
+                out_buffer[current_out_len++] = (char)wc;
+            } else {
+                out_buffer[current_out_len++] = '?';
+            }
+        } else break;
     }
     out_buffer[current_out_len] = '\0';
     return current_out_len - original_out_len;
@@ -324,7 +287,6 @@ static size_t fat_lfn_to_utf8(const uint8_t *utf16_name_part, size_t copy_len, c
 
 fat_error_t fat_init_root_dir_iterator(fat_directory_iterator_t *iter, uint32_t start_cluster) {
     if (!g_fat32_volume_info.is_initialized) {
-        //uartTxStr("Error: FAT32 volume not initialized before root dir iterator.\r\n");
         return FAT_ERROR_NOT_INITIALIZED;
     }
     if (iter == NULL) {
@@ -337,17 +299,8 @@ fat_error_t fat_init_root_dir_iterator(fat_directory_iterator_t *iter, uint32_t 
     iter->current_entry_in_sector = 0;
     iter->sector_buffer_valid = false;
 
-    iter->assembled_lfn_buffer[0] = '\0';
-    iter->lfn_parts_found = 0;
-    iter->lfn_checksum = 0;
+    //iter->lfn_checksum = 0;
     return FAT_SUCCESS;
-}
-
-static void reset_lfn_state(fat_directory_iterator_t *iter) {
-    iter->lfn_parts_found = 0;
-    iter->lfn_checksum = 0;
-    iter->assembled_lfn_buffer[0] = '\0';
-    for (uint8_t i = 0; i < MAX_LFN_PARTS; i++) iter->lfn_buffer[i][0] = '\0';
 }
 
 fat_error_t fat_read_next_dir_entry(fat_directory_iterator_t *iter, fat_file_info_t *file_info_out) {
@@ -355,12 +308,10 @@ fat_error_t fat_read_next_dir_entry(fat_directory_iterator_t *iter, fat_file_inf
         return FAT_ERROR_NOT_INITIALIZED;
     }
     if (file_info_out == NULL || iter == NULL) {
-        //uartTxStr("file info is NULL\r\n");
         return FAT_ERROR_BAD_FAT_ENTRY;
     }
 
-    // uint32_t cluster_size_bytes = g_fat32_volume_info.bytes_per_sector * g_fat32_volume_info.sectors_per_cluster;
-    uint32_t entries_per_sector = g_fat32_volume_info.bytes_per_sector / 32;
+    const uint32_t entries_per_sector = g_fat32_volume_info.bytes_per_sector / 32;
 
     for (;;) {
         // Check if we need to load a new sector
@@ -374,11 +325,7 @@ fat_error_t fat_read_next_dir_entry(fat_directory_iterator_t *iter, fat_file_inf
                 uint32_t next_cluster;
                 fat_error_t fat_res = getNextCluster(iter->current_cluster, &next_cluster);
                 
-                if (fat_res == FAT_ERROR_END_OF_CHAIN) {
-                    //uartTxStr("End of dir chain\r\n");
-                    return FAT_ERROR_NO_MORE_ENTRIES;
-                } else if (fat_res != FAT_SUCCESS) {
-                    //uartTxStr("Failed to get next cluster in dir\r\n");
+                if (fat_res != FAT_SUCCESS) {
                     return fat_res;
                 }
 
@@ -389,8 +336,7 @@ fat_error_t fat_read_next_dir_entry(fat_directory_iterator_t *iter, fat_file_inf
             // Read new sector
             uint32_t sector_lba = fatClusterToLba(iter->current_cluster) + iter->current_sector_in_cluster;
 
-            if (sdReadBlock(sector_lba, iter->sector_buffer) == false) {
-                //uartTxStr("Failed to read dir sector\r\n");
+            if (!sdReadBlock(sector_lba, iter->sector_buffer)) {
                 return FAT_ERROR_READ_FAIL;
             }
             iter->sector_buffer_valid = true;
@@ -398,52 +344,51 @@ fat_error_t fat_read_next_dir_entry(fat_directory_iterator_t *iter, fat_file_inf
 
         // Process the current entry in the buffer
         fat_dir_entry_t *entry = (fat_dir_entry_t *)(iter->sector_buffer + (iter->current_entry_in_sector * 32));
-
         iter->current_entry_in_sector++; // Move to next entry for next call
 
         uint8_t first_byte = entry->raw[0];
 
         // Check for end of dir marker (0x00)
         if (first_byte == 0x00) {
-            //uartTxStr("End of dir marker found\r\n");
             return FAT_ERROR_NO_MORE_ENTRIES;
         }
 
         // Check for deleted entry
         if (first_byte == 0xE5) continue; // Skip
-
+        
+        char lfn_buffer[MAX_LFN_PARTS][MAX_UTF8_CHARS_PER_LFN_PART];
+        // for (uint8_t i)
+        // char assembled_lfn_buffer[MAX_FILENAME_LEN];
+        uint8_t lfn_parts_found;
         // Check for LFN entry
         if ((entry->sfn.DIR_Attr & FAT_ATTR_LFN) == FAT_ATTR_LFN) {
             fat_lfn_dir_entry_t *lfn_entry = &entry->lfn;
-            uint8_t order = lfn_entry->LDIR_Ord & ~0x40;
+            const uint8_t order_flags = lfn_entry->LDIR_Ord;
+            const uint8_t sequence_order = order_flags & ~0x40;
             
-            if (order == 0 || order > MAX_LFN_PARTS) {
-                reset_lfn_state(iter);
+            if (sequence_order == 0 || sequence_order > MAX_LFN_PARTS) {
+                lfn_parts_found = 0;
+                iter->lfn_checksum = 0;
                 continue;
             }
 
-            // // Check if this is the last LFN entry
-            if (lfn_entry->LDIR_Ord & 0x40) {
+            // Check if this is the last LFN entry
+            if (order_flags & 0x40) {
                 iter->lfn_checksum =lfn_entry->LDIR_Chksum;
-                // Clear segment buffers
-                for (uint8_t i = 0; i < MAX_LFN_PARTS; i++) iter->lfn_buffer[i][0] = '\0';
             } else if (iter->lfn_checksum == 0) {
-                reset_lfn_state(iter);
-                //uartTxStr("Out of order lfn part\r\n");
+                lfn_parts_found = 0;
+                iter->lfn_checksum = 0;
                 continue;
             }
 
-            char *segment_dest = iter->lfn_buffer[order - 1];
-            segment_dest[0] = '\0';
-
+            char *segment_dest = lfn_buffer[sequence_order - 1];;
             size_t current_segment_len = 0;
 
             current_segment_len += fat_lfn_to_utf8((uint8_t *)lfn_entry->LDIR_Name1, 10, segment_dest, MAX_FILENAME_LEN, current_segment_len);
             current_segment_len += fat_lfn_to_utf8((uint8_t *)lfn_entry->LDIR_Name2, 12, segment_dest, MAX_FILENAME_LEN, current_segment_len);
             fat_lfn_to_utf8((uint8_t *)lfn_entry->LDIR_Name3, 4, segment_dest, MAX_FILENAME_LEN, current_segment_len);
 
-            iter->lfn_parts_found++;
-
+            lfn_parts_found++;
             continue;
         }
 
@@ -451,35 +396,24 @@ fat_error_t fat_read_next_dir_entry(fat_directory_iterator_t *iter, fat_file_inf
         fat_sfn_dir_entry_t *sfn_entry = &entry->sfn;
 
         // Validate LFN checksum if an LFN sequence was being processed
-        if (iter->lfn_parts_found > 0) {
-            uint8_t sfn_checksum = fat_sfn_checksum(sfn_entry->DIR_Name);
-
-            if (sfn_checksum == iter->lfn_checksum) {
-                iter->assembled_lfn_buffer[0] = '\0';
-                for (uint8_t i = 0; i < iter->lfn_parts_found; i++) {
-                    if (iter->lfn_buffer[i][0] == '\0') continue;
-                    strncat(iter->assembled_lfn_buffer, iter->lfn_buffer[i], MAX_FILENAME_LEN - 1 - strlen(iter->assembled_lfn_buffer));
+        if (iter->lfn_checksum != 0 && fat_sfn_checksum(sfn_entry->DIR_Name) == iter->lfn_checksum) {
+            file_info_out->filename[0] = '\0';
+            for (uint8_t i = 0; i < lfn_parts_found; i++) {
+                if (lfn_buffer[i][0] != '\0') {
+                    strncat(file_info_out->filename, lfn_buffer[i], MAX_FILENAME_LEN - 1 - strlen(file_info_out->filename));
                 }
-                iter->assembled_lfn_buffer[MAX_FILENAME_LEN-1] = '\0';
-
-                strncpy(file_info_out->filename, iter->assembled_lfn_buffer, MAX_FILENAME_LEN - 1);
-                file_info_out->filename[MAX_FILENAME_LEN - 1] = '\0';
-            } else {
-                // Checksum mismatch, fallback to sfn
-                //uartTxStr("LFN checksum mismtach, falling back to sfn\r\n");
-                fat_sfn_to_string(sfn_entry->DIR_Name, file_info_out->filename);
             }
-            
-            // Reset LFN state after matching SFN
-            reset_lfn_state(iter);
+            file_info_out->filename[MAX_FILENAME_LEN - 1] = '\0';
         } else {
             // No LFN, use SFN
             fat_sfn_to_string(sfn_entry->DIR_Name, file_info_out->filename);
         }
 
+        lfn_parts_found = 0;
+        iter->lfn_checksum = 0;
+
         file_info_out->first_cluster = (read_le16((uint8_t*)sfn_entry, 20) << 16) | read_le16((uint8_t*)sfn_entry, 26);
         file_info_out->file_size = read_le32((uint8_t*)sfn_entry, 28);
-
         file_info_out->attributes = sfn_entry->DIR_Attr;
         file_info_out->is_directory = (sfn_entry->DIR_Attr & FAT_ATTR_DIRECTORY) != 0;
 
@@ -492,205 +426,157 @@ fat_error_t fat_read_next_dir_entry(fat_directory_iterator_t *iter, fat_file_inf
     }
 }
 
-static inline int min(int a, int b) {
-    if (a < b) {
-        return a;
-    } else {
-        return b;
-    }
-}
-
 static fat_error_t fat_read_file(uint32_t file_id, uint8_t *buffer, uint32_t bytes_to_read) {
     if (!g_fat32_volume_info.is_initialized) {
         return FAT_ERROR_NOT_INITIALIZED;
     }
-
     if (buffer == NULL) {
+        return FAT_ERROR_BAD_FAT_ENTRY;
+    }
+    if (file_id >= MAX_OPEN_FILES || open_file_handles[file_id].is_free) {
         return FAT_ERROR_BAD_FAT_ENTRY;
     }
 
     file_handle_t *file_handle = &open_file_handles[file_id];
 
-    // Ensure we dont read beyong the size or requested bytes
-    if (file_handle->current_file_pos >= file_handle->file_size) {
-        return FAT_SUCCESS;
-    }
-
-    uint32_t actual_bytes_to_read = bytes_to_read;
-    if (file_handle->current_file_pos + actual_bytes_to_read > file_handle->file_size) {
-        actual_bytes_to_read = file_handle->file_size - file_handle->current_file_pos;
-    }
+    uint32_t actual_bytes_to_read = min(bytes_to_read, file_handle->file_size - file_handle->current_file_pos);
     if (actual_bytes_to_read == 0) {
-        //uartTxStr("No bytes to read\r\n");
         return FAT_SUCCESS; // Nothing to read
     }
 
     uint32_t bytes_read_total = 0;
 
-    uint32_t sectors_per_cluster = g_fat32_volume_info.sectors_per_cluster;
-    uint32_t bytes_per_sector = g_fat32_volume_info.bytes_per_sector;
-    uint32_t bytes_per_cluster = sectors_per_cluster * bytes_per_sector;
-
-    uint8_t sector_buffer[bytes_per_sector]; // Temp buffer for reading sectors
-
-    // Calculate the byte offset withing the starting cluster.
-
-    uint32_t current_sector_in_cluster = file_handle->current_offset / bytes_per_sector;
-    uint32_t current_byte_in_sector = file_handle->current_offset % bytes_per_sector;
-
-    // Loop to read data
     while (bytes_read_total < actual_bytes_to_read) {
+        uint32_t current_sector_in_cluster = file_handle->current_offset / g_fat32_volume_info.bytes_per_sector;
+        uint32_t current_byte_in_sector = file_handle->current_offset % g_fat32_volume_info.bytes_per_sector;
+
         uint32_t current_sector_lba = fatClusterToLba(file_handle->current_cluster) + current_sector_in_cluster;
 
-        if (!sdReadBlock(current_sector_lba, sector_buffer)) {
-            //uartTxStr("Error: Failed to read file data sector.\r\n");
-            return FAT_ERROR_READ_FAIL;
-        }
-        
         // Calculate how much data to copy from this sector
-        uint32_t bytes_left_in_sector = bytes_per_sector - current_byte_in_sector;
+        uint32_t bytes_left_in_sector = g_fat32_volume_info.bytes_per_sector - current_byte_in_sector;
         uint32_t bytes_to_copy = min(actual_bytes_to_read - bytes_read_total, bytes_left_in_sector);
 
-        memcpy(buffer + bytes_read_total, sector_buffer + current_byte_in_sector, bytes_to_copy);
-        
+        if (!sdReadPartialBlock(current_sector_lba, current_byte_in_sector, buffer + bytes_read_total, bytes_to_copy)) {
+            return FAT_ERROR_READ_FAIL;
+        }
+
         file_handle->current_file_pos += bytes_to_copy;
         file_handle->current_offset += bytes_to_copy;
         bytes_read_total += bytes_to_copy;
 
-        // // Prepare for next read
-        // start_byte_in_sector = 0;
-        // start_sector_in_cluster++;
-        current_byte_in_sector = (file_handle->current_offset % bytes_per_sector);
-        current_sector_in_cluster = (file_handle->current_offset / bytes_per_sector);
-
-        if (file_handle->current_offset >= bytes_per_cluster) {
+        if (file_handle->current_offset >= g_fat32_volume_info.bytes_per_cluster) {
             uint32_t next_cluster;
             fat_error_t res = getNextCluster(file_handle->current_cluster, &next_cluster);
 
             if (res == FAT_ERROR_END_OF_CHAIN) {
-                // Reached end of file (or chain)
-                break; // Exit loop, even if actual_bytes_to_read hasn't been met (file was shorter)
+                break; // Reached end of file
             } else if (res != FAT_SUCCESS) {
-                // uartTxStr("Error getting next cluster for file data.\r\n");
                 return res;
             }
             file_handle->current_cluster = next_cluster;
             file_handle->current_offset = 0;
-            current_sector_in_cluster = 0;
-            current_byte_in_sector = 0;
         }
-
-        if (bytes_read_total >= actual_bytes_to_read) {
-            break;
-        }
-
-        if (file_handle->current_file_pos >= file_handle->file_size) {
-            break;
-        }
-
     }
 
     return FAT_SUCCESS;
 }
 
 static fat_error_t get_file(const char *path, fat_file_info_t *file) {
-    if (path == NULL) {
-        //uartTxStr("Invalid file: "); uartTxStr(path); uartTxStr("\r\n");
+    if (path == NULL || file == NULL) {
         return FAT_ERROR_BAD_FAT_ENTRY;
     } 
 
-    // increment path pointer untill we find a '/'
-    // save the string up untill the slash, and increment the pointer again to skip it
-    // search for a directory with the name that was saved
-    // if we find a null terminator instead, look for a file
-    // break if a file is found
-    // break if directory or file cannot be found
-
     char name_buffer[MAX_FILENAME_LEN];
-    bool final_dir = false;
     fat_directory_iterator_t dir_iter;
-    fat_init_root_dir_iterator(&dir_iter, g_fat32_volume_info.root_dir_cluster); 
     fat_file_info_t current_entry;
 
-    while (*path != '\0') {
-        unsigned int i = 0;
-        path++;
+    fat_error_t init_res = fat_init_root_dir_iterator(&dir_iter, g_fat32_volume_info.root_dir_cluster);
+    if(init_res != FAT_SUCCESS) {
+        return init_res;
+    } 
+
+    path++;
+
+    for (;;) {
+        uint16_t i = 0;
+        bool final_path_component = false;
 
         // get current dir/file name
-        while(*path != '/') {
-            if (*path == '\0') {
-                final_dir = true;
-                break;
+        while(*path != '/' && *path != '\0') {
+            if (i < MAX_FILENAME_LEN - 1) {
+                name_buffer[i++] = *path;
             }
-            name_buffer[i] = *path;
-            i++;
             path++;
         }
         name_buffer[i] = '\0'; 
 
+        if (*path == '\0') {
+            final_path_component = true;
+        } else {
+            path++;
+        }
+
+        if (name_buffer[0] == '\0' && !final_path_component) { // Handle empty component (e.g., "//")
+            continue;
+        }
+
         // find dir/file name in current directory
-        fat_error_t result = FAT_SUCCESS;
+        fat_error_t result = FAT_ERROR_NO_MORE_ENTRIES;
         do {
             result = fat_read_next_dir_entry(&dir_iter, &current_entry);
 
             if (result == FAT_SUCCESS) {
                 if (strcmp(name_buffer, current_entry.filename) == 0) {
-                    if (current_entry.is_directory && !final_dir) {
-                        // uartTxStr("found dir\r\n");
-                        fat_init_root_dir_iterator(&dir_iter, current_entry.first_cluster);
+                    if (current_entry.is_directory && !final_path_component) {
+                        init_res = fat_init_root_dir_iterator(&dir_iter, current_entry.first_cluster);
+                        if (init_res != FAT_SUCCESS) {
+                            return init_res;
+                        }
                         break;
-                    } else if (final_dir) {
-                        // uartTxStr("Found file\r\n");
+
+                    } else if (final_path_component && !current_entry.is_directory) {
                         *file = current_entry;
                         return FAT_SUCCESS;
+
+                    } else if (final_path_component && current_entry.is_directory) {
+                        return FAT_ERROR_FILE_NOT_FOUND;
                     }
                 }
+            } else if (result == FAT_ERROR_NO_MORE_ENTRIES) {
+                return FAT_ERROR_FILE_NOT_FOUND;
             } else {
-                if (result == FAT_ERROR_NO_MORE_ENTRIES) {
-                    uartTxStr(name_buffer); uartTxStr(": No such file or directory\r\n");
-                }
                 return result;
             }
 
         } while (result == FAT_SUCCESS);
     }
-    return FAT_ERROR_NO_MORE_ENTRIES;
+    return FAT_ERROR_FILE_NOT_FOUND;
 }
 
 uint32_t fat32_open(const char* path, const uint8_t mode) {
     fat_file_info_t file;
-    fat_error_t result = get_file(path, &file);
-    if (result != FAT_SUCCESS) {
-        //uartTxStr("Unable to open file");
-        return MAX_OPEN_FILES + 1;
+    if (get_file(path, &file) != FAT_SUCCESS) {
+        return (uint32_t)-1;
     }
 
-    bool found = false;
-    uint32_t i;
-    for (i = 0; i < MAX_OPEN_FILES; i++) {
-        if(open_file_handles[i].is_free == true) {
-            found = true;
-            break;
+    for (uint32_t i = 0; i < MAX_OPEN_FILES; i++) {
+        if(open_file_handles[i].is_free) {
+            file_handle_t *handle = &open_file_handles[i];
+            handle->cluster_start = file.first_cluster;
+            handle->current_cluster = file.first_cluster;
+            handle->current_offset = 0;
+            handle->file_size = file.file_size;
+            handle->current_file_pos = 0;
+            handle->is_free = false;
+            handle->mode = mode;
+            return i;
         }
     }
-    if (!found) {
-        //uartTxStr("Maximum amount of files open");
-        return MAX_OPEN_FILES + 2;
-    }
-
-    file_handle_t *handle = &open_file_handles[i];
-    handle->cluster_start = file.first_cluster;
-    handle->current_cluster = file.first_cluster;
-    handle->current_offset = 0;
-    handle->file_size = file.file_size;
-    handle->current_file_pos = 0;
-    handle->is_free = false;
-    handle->mode = mode;
-    return i;
+    return (uint32_t)-1;
 }
 
 bool fat32_close(uint32_t file_id) {
-    if (file_id > MAX_OPEN_FILES) {
+    if (file_id >= MAX_OPEN_FILES) {
         return false;
     }
 
@@ -699,22 +585,19 @@ bool fat32_close(uint32_t file_id) {
 }
 
 bool fat32_read(uint32_t file_id, uint8_t *buffer, uint32_t bytes_to_read) {
-    if (file_id > MAX_OPEN_FILES || buffer == NULL) {
+    if (file_id >= MAX_OPEN_FILES || buffer == NULL) {
+        return false;
+    }
+    if (open_file_handles[file_id].is_free) {
         return false;
     }
 
-    // uint8_t test_buff[513];
-    // test_buff[512] = '\0';
-
-    fat_error_t result = fat_read_file(file_id, buffer, bytes_to_read);
-    if (result != FAT_SUCCESS) {
-        //uartTxDec(result);
-        return false;
-    }
-    // uartTxStr(test_buff);
-    return true;
+    return fat_read_file(file_id, buffer, bytes_to_read) == FAT_SUCCESS;
 }
 
 uint32_t fat32_get_size(uint32_t file_id) {
+    if (file_id >= MAX_OPEN_FILES) {
+        return 0;
+    }
     return open_file_handles[file_id].file_size;
 }
